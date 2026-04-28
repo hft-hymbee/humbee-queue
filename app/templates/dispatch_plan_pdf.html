@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dispatch Plan PDF</title>
+    <style>
+      * {
+        border: 0;
+        margin: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        width: 100%;
+      }
+
+      table {
+        border-collapse: collapse;
+        border-spacing: 0;
+        border: 0;
+      }
+
+      th,
+      td {
+        border: 1px solid black;
+        border-collapse: collapse;
+        text-align: left;
+        padding: 5px;
+      }
+
+      .distributor_table {
+        display: $distributor_display_val;
+      }
+    </style>
+  </head>
+  <body>
+    <table style="min-width: 100%" class="distributor_table">
+      <tr>
+        <th style="color: red; text-align: center" colspan="2">
+          DISPATCH PROGRAM
+        </th>
+      </tr>
+      <tr>
+        <td>
+          <p>Purchase Order and Date</p>
+          <p>User Purchase Order Id</p>
+          <p>Order ID</p>
+          <p>Order Date</p>
+        </td>
+        <td>
+          <p>$po_no_and_date</p>
+          <p>$user_po_id</p>
+          <p>$humbee_order_id</p>
+          <p>$humbee_order_date</p>
+        </td>
+      </tr>
+      <tr>
+        <td style="color: red; font-weight: bold" colspan="1">
+          BUYER <br />
+          (BILL TO)
+        </td>
+        <td colspan="1">
+          <p style="font-weight: bold">$distributor_company_name</p>
+          <p>$distributor_company_addr</p>
+          <p>GSTIN:- $distributor_company_gst</p>
+          <p>PAN:- $distributor_company_pan</p>
+        </td>
+      </tr>
+      <tr>
+        <td colspan="2">&nbsp;</td>
+      </tr>
+    </table>
+    <table style="width: 100%" class="seller_table">
+      <tr>
+        <td rowspan="2" style="color: red; font-weight: bold">
+          <p>CONSIGNEE</p>
+          <p>(SHIP TO)</p>
+          <br />
+          <p>$order_delivery_type_1</p>
+        </td>
+        <td colspan="7">
+          <p style="font-weight: bold">$buyer1_company_name</p>
+          <!-- Order Product Delivery Address -->
+          <p>$buyer1_company_addr</p>
+          <p>GSTIN: $buyer1_company_gst</p>
+          <p>PAN: $buyer1_company_pan</p>
+        </td>
+      </tr>
+      <tr>
+        <td colspan="7">
+          <!-- Order Product Delivery Contact No./Ship To Party Company Number -->
+          <p>CONTACT NUMBER: $buyer1_company_contact</p>
+        </td>
+      </tr>
+      <tr>
+        <th style="width: 14%; font-weight: bold" colspan="1">PRODUCT NAME</th>
+        <th style="width: 14%; font-weight: bold" colspan="1">FORM TYPE</th>
+        <th style="width: 14%; font-weight: bold" colspan="1">UP/DOWN</th>
+        <th style="width: 14%; font-weight: bold" colspan="1">UoM</th>
+        <th style="width: 14%; font-weight: bold" colspan="1">QTY</th>
+        <th style="width: 14%; font-weight: bold" colspan="1">PRICE/UNIT</th>
+        <th style="width: 14%; font-weight: bold" colspan="1">GROSS AMOUNT</th>
+        <th style="width: 14%; font-weight: bold" colspan="1">REMARK</th>
+      </tr>
+      $buyer1_details
+      <tr style="text-align: center">
+        <td colspan="1" style="font-weight: bold">TOTAL</td>
+        <td colspan="1" style="font-weight: bold"></td>
+        <td colspan="1" style="font-weight: bold"></td>
+        <td colspan="1" style="font-weight: bold"></td>
+        <td colspan="1" style="font-weight: bold">$buyer1_product_total</td>
+        <td colspan="1" style="font-weight: bold"></td>
+        <td colspan="1" style="font-weight: bold">$total_price</td>
+        <td colspan="1" style="font-weight: bold"></td>
+      </tr>
+    </table>
+  </body>
+</html>

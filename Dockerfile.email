@@ -1,0 +1,16 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements-email.txt .
+RUN pip install --no-cache-dir -r requirements-email.txt
+
+# ✅ Copy modules at ROOT (same as API)
+COPY app/core ./core
+COPY app/notification_email ./notification_email
+
+ENV PYTHONPATH=/app
+
+# Templates automatically included via email folder
+
+CMD ["celery", "-A", "notification_email.tasks.tasks", "worker", "-Q", "email_queue", "--loglevel=info"]

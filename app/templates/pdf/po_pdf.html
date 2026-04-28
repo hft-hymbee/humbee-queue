@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PO Document</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      header {
+        text-align: center;
+        padding: 5px;
+        border-bottom: 2px solid black;
+      }
+      h1,
+      h3 {
+        margin: 5px;
+      }
+      .company_name {
+        color: red;
+        font-size: 2.5rem;
+      }
+      .company_addr {
+        color: blueviolet;
+      }
+      main {
+        margin: 10px 0 0 0;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+      .center-text {
+        margin-bottom: 10px;
+        text-align: center;
+      }
+      table,
+      th,
+      td {
+        overflow: hidden;
+        padding: 10px 5px;
+        text-align: left;
+        border: 1px solid black;
+        border-collapse: collapse;
+      }
+      table {
+        width: 100%;
+        margin: 10px 0;
+      }
+      td {
+        text-align: center;
+      }
+      ul li {
+        list-style: "⮚";
+      }
+      footer {
+        display: grid;
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 2px solid black;
+        grid-auto-flow: column;
+        grid-template-columns: 50% 50%;
+      }
+      .authorise {
+        text-align: end;
+      }
+    </style>
+  </head>
+  <body style="margin-left: auto; margin-right: auto">
+    <header>
+      <h1 class="company_name"><u>$seller_company_name</u></h1>
+      <h3 class="company_addr">$seller_company_addr</h3>
+    </header>
+    <main class="content-container">
+      <section>
+        <h3 class="center-text"><u>PURCHASE ORDER</u></h3>
+      </section>
+      <section class="address-container">
+        <p>TO:</p>
+        <b>
+          <p class="address">
+            $buyer_company_name<br />
+            $buyer_company_addr<br />
+          </p>
+          <p>
+            GSTIN :- $buyer_company_gst <br />
+            PAN :- $buyer_company_pan
+          </p>
+        </b>
+      </section>
+      <section class="goods-container">
+        <table class="goods">
+          <tr>
+            <th colspan="2">
+              CONTACT NAME: $buyer_user_name <br />MOBILE NO: $buyer_user_mob
+            </th>
+            <th colspan="2">PO NO: $po_id <br />DATE: $date</th>
+          </tr>
+          <tr>
+            <th>SNO</th>
+            <th>DESCRIPTION OF GOODS</th>
+            <th>QTY.</th>
+            <th>BASIC RATE</th>
+          </tr>
+          $product_details
+        </table>
+      </section>
+      <section>
+        <ul>
+          <li>PAYMENT TERMS :- Against Loading</li>
+          <li>
+            DELIVERY MODE :- (A) Delivered at Party (FOR) <br />
+            (B) Delivery against our given schedule as per consignee details<br />
+          </li>
+          <li>REMARK :- Discounts and Schemes as per your policies.</li>
+        </ul>
+      </section>
+    </main>
+    <footer class="footer-container">
+      <section>
+        <b>
+          CONTACT NAME :- $seller_user_name <br />
+          MOBILE NO :- $seller_user_mob <br />
+          GSTIN :- $seller_company_gst <br />
+          PAN :- $seller_company_pan
+        </b>
+      </section>
+      <section class="authorise">
+        <p>FOR $seller_company_name</p>
+        <br /><br /><br /><br />
+        <p>Authorized Signatory</p>
+      </section>
+    </footer>
+    <section style="float: left">
+      <ul>
+        <li>PAYMENT TERMS - Advance</li>
+        <li>Inco Terms – FOR /EX</li>
+        <li>Discounts and Schemes – as per policy <br /></li>
+        <li>Size/length/grade extra will be as applicable</li>
+        <li>
+          Taxes will be charge as actual Unloading of material will be in buyers
+          <br />
+          scope Force majeure clause will be applicable Dispatch plan we must
+          <br />
+          receive within 15 days from the date of PO Weight tolerance +/- 2% of
+          <br />
+          total PO quantity.
+        </li>
+      </ul>
+    </section>
+  </body>
+</html>

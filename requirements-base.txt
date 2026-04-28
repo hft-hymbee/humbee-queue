@@ -1,0 +1,9 @@
+celery[redis]
+pydantic
+jinja2
+PyPDF2
+fastapi
+uvicorn
+debugpy
+curlify
+weasyprint

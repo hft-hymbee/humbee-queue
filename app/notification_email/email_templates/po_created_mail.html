@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PO Created</title>
+  </head>
+  <body>
+    <p>Dear $cement_co_name</p>
+    <p>
+      We are glad to inform you that a Purchase Order: $order_booking_id has been created by<br />
+      Distributor name: $distributor_name on $created_at.
+    </p>
+    <table style="border: 1px solid black; border-collapse: collapse">
+      <tr>
+        <th
+          style="
+            border: 1px solid black;
+            border-collapse: collapse;
+            padding: 10px;
+          "
+        >
+          Base Product Name
+        </th>
+        <th
+          style="
+            border: 1px solid black;
+            border-collapse: collapse;
+            padding: 10px;
+          "
+        >
+          Quantity
+        </th>
+      </tr>
+      $table_data
+    </table>
+    <br/>
+    Best Regards,<br />
+    Team Humbee
+  </body>
+</html>

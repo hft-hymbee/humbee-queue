@@ -1,0 +1,53 @@
+services:
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "8002:8000"
+      - "5678:5678"
+    command:
+      - python
+      - -m
+      - debugpy
+      - --listen
+      - 0.0.0.0:5678
+      - --wait-for-client
+      - -m
+      - uvicorn
+      - main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+    depends_on:
+      - redis
+
+  email_sender_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.email
+    command: celery -A notification_email.tasks.tasks worker -Q email_queue --loglevel=info
+    depends_on:
+      - redis
+
+  sms_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.sms
+    depends_on:
+      - redis
+
+  flower:
+    image: mher/flower
+    command: celery --broker=redis://redis:6379/0 flower
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7
+    ports:
+      - "6380:6379"
