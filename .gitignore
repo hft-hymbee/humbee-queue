@@ -219,3 +219,8 @@ __marimo__/
 
 # macOS
 .DS_Store
+
+# Local folder to store README files
+z_untracked_readme/
+
+secrets.json
