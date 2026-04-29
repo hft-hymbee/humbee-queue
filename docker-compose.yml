@@ -1,53 +1,125 @@
 services:
 
+  # ─── API ────────────────────────────────────────────────────────
   api:
     build:
       context: .
-      dockerfile: Dockerfile.api
+      dockerfile: Dockerfile
     ports:
       - "8002:8000"
-      - "5678:5678"
-    command:
-      - python
-      - -m
-      - debugpy
-      - --listen
-      - 0.0.0.0:5678
-      - --wait-for-client
-      - -m
-      - uvicorn
-      - main:app
-      - --host
-      - 0.0.0.0
-      - --port
-      - "8000"
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      - ENV=LOCAL
+      - SECRETS_FILE_PATH=/app/secrets.json
+    volumes:
+      - ./app:/app
+      - ./secrets.json:/app/secrets.json:ro
     depends_on:
       - redis
+      - postgres
 
-  email_sender_worker:
+  # ─── Email Worker ───────────────────────────────────────────────
+  email_worker:
+    hostname: email_worker
     build:
       context: .
-      dockerfile: Dockerfile.email
-    command: celery -A notification_email.tasks.tasks worker -Q email_queue --loglevel=info
+      dockerfile: Dockerfile
+    command: celery -A core.celery_app:celery_app worker -Q email_queue -c 4 --loglevel=info
+    environment:
+      - ENV=LOCAL
+      - SECRETS_FILE_PATH=/app/secrets.json
+    volumes:
+      - ./app:/app
+      - ./secrets.json:/app/secrets.json:ro
     depends_on:
       - redis
+      - postgres
 
+  # ─── SMS Worker ─────────────────────────────────────────────────
   sms_worker:
+    hostname: sms_worker
     build:
       context: .
-      dockerfile: Dockerfile.sms
+      dockerfile: Dockerfile
+    command: celery -A core.celery_app:celery_app worker -Q sms_queue -c 4 --loglevel=info
+    environment:
+      - ENV=LOCAL
+      - SECRETS_FILE_PATH=/app/secrets.json
+    volumes:
+      - ./app:/app
+      - ./secrets.json:/app/secrets.json:ro
     depends_on:
       - redis
+      - postgres
 
+  # ─── WhatsApp Worker ────────────────────────────────────────────
+  whatsapp_worker:
+    hostname: whatsapp_worker
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: celery -A core.celery_app:celery_app worker -Q whatsapp_queue -c 4 --loglevel=info
+    environment:
+      - ENV=LOCAL
+      - SECRETS_FILE_PATH=/app/secrets.json
+    volumes:
+      - ./app:/app
+      - ./secrets.json:/app/secrets.json:ro
+    depends_on:
+      - redis
+      - postgres
+
+  # ─── InApp Worker ───────────────────────────────────────────────
+  inapp_worker:
+    hostname: inapp_worker
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: celery -A core.celery_app:celery_app worker -Q inapp_queue -c 2 --loglevel=info
+    environment:
+      - ENV=LOCAL
+      - SECRETS_FILE_PATH=/app/secrets.json
+    volumes:
+      - ./app:/app
+      - ./secrets.json:/app/secrets.json:ro
+    depends_on:
+      - redis
+      - postgres
+
+  # ─── Flower (Celery Monitor) ────────────────────────────────────
   flower:
-    image: mher/flower
-    command: celery --broker=redis://redis:6379/0 flower
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: celery -A core.celery_app:celery_app flower --port=5555
     ports:
       - "5555:5555"
+    environment:
+      - ENV=LOCAL
+      - SECRETS_FILE_PATH=/app/secrets.json
+    volumes:
+      - ./app:/app
+      - ./secrets.json:/app/secrets.json:ro
     depends_on:
       - redis
 
+  # ─── Redis ──────────────────────────────────────────────────────
   redis:
-    image: redis:7
+    image: redis:8-alpine
     ports:
       - "6380:6379"
+
+  # ─── PostgreSQL ─────────────────────────────────────────────────
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: notification_db
+    ports:
+      - "5435:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
