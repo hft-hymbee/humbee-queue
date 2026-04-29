@@ -14,6 +14,8 @@ services:
     volumes:
       - ./app:/app
       - ./secrets.json:/app/secrets.json:ro
+      - ./alembic:/app/alembic
+      - ./alembic.ini:/app/alembic.ini
     depends_on:
       - redis
       - postgres
