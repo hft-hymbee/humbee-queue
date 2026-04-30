@@ -224,3 +224,12 @@ __marimo__/
 z_untracked_readme/
 
 secrets.json
+
+# Docker mount side-effects
+# These folders are mounted from host, so don't commit them
+app/alembic/
+app/alembic.ini
+
+
+# vscode
+.vscode
