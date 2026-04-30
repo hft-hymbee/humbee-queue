@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'app'))
 
 from core.config import settings
 from core.database import Base
-from domain.models import NotificationHistory  # noqa: F401 — ensure model is registered
+from domain.models import NotificationHistory
 
 config = context.config
 
