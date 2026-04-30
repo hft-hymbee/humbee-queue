@@ -8,7 +8,7 @@ from typing import List, Optional, Union
 
 from pydantic import BaseModel, validator
 
-from domain.enums import NotificationChannel, NotificationStatus
+from domain.enums import NotificationChannel
 
 
 # ─── Request DTOs ───────────────────────────────────────────────
@@ -45,10 +45,10 @@ class SendNotificationDTO(BaseModel):
             "example": {
                 "event_type": "ORDER_PLACED",
                 "user_id": "user_123",
-                "channels": ["EMAIL", "SMS"],
-                "template_id": "order.create.erw_angles",
-                "recipients": ["user@example.com", "+919999999999"],
-                "subject": "Order Created - ORD-001",
+                "channels": ["SMS"],
+                "template_id": "1234432112344321",
+                "recipients": ["8052484213"],
+                "subject": "",
                 "payload": {
                     "order_id": "ORD-001",
                     "humbee_po_number": "PO-12345",
