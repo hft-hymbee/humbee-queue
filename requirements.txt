@@ -19,6 +19,7 @@ weasyprint
 # HTTP
 requests
 curlify
+boto3
 
 # Logging
 python-json-logger

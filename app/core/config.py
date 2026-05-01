@@ -56,6 +56,12 @@ class Settings:
         self.WHATSAPP_API_URL: str = self._get("whatsapp", "api_url", default="")
         self.WHATSAPP_API_KEY: str = self._get("whatsapp", "api_key", default="")
         self.WHATSAPP_SENDER_ID: str = self._get("whatsapp", "sender_id", default="")
+        self.WHATSAPP_MEDIA_UPLOAD_URL: str = self._get("whatsapp", "media_upload_url", default="")
+
+        # --- AWS / S3 ---
+        self.AWS_ACCESS_KEY_ID: str = self._get("aws", "access_key_id", default="")
+        self.AWS_SECRET_ACCESS_KEY: str = self._get("aws", "secret_access_key", default="")
+        self.AWS_REGION: str = self._get("aws", "region", default="ap-south-1")
 
     def _get(self, group: str, key: str, default=None):
         """Get a secret value, returning default if not found."""
