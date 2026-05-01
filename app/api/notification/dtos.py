@@ -19,23 +19,23 @@ class SendNotificationDTO(BaseModel):
 
     event_type: str
     user_id: Optional[str] = None
-    channels: List[NotificationChannel]
+    channels: Union[NotificationChannel, List[NotificationChannel]]
     template_id: str
     recipients: Union[str, List[str]]
     subject: Optional[str] = None
     payload: dict = {}
     request_id: Optional[str] = None
 
-    @validator("recipients", pre=True)
-    def normalize_recipients(cls, v):
-        """Accept single string or list of strings."""
-        if isinstance(v, str):
-            return [v]
-        return v
-
     @validator("channels", pre=True)
     def normalize_channels(cls, v):
         """Accept single channel or list of channels."""
+        if isinstance(v, list):
+            return [v[0]] if v else v
+        return [v]
+
+    @validator("recipients", pre=True)
+    def normalize_recipients(cls, v):
+        """Accept single string or list of strings."""
         if isinstance(v, str):
             return [v]
         return v
