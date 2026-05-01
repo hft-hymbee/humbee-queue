@@ -99,9 +99,3 @@ class NotificationStatusResponse(BaseModel):
         from_attributes = True
 
 
-class HealthResponse(BaseModel):
-    """Response for GET /health"""
-
-    status: str
-    service: str
-    version: str

@@ -15,7 +15,6 @@ from api.notification.dtos import (
     SendNotificationResponse,
     NotificationResult,
     NotificationStatusResponse,
-    HealthResponse,
 )
 from core.database import get_db
 from core.logging import get_logger
@@ -25,17 +24,6 @@ from services.notification_service import NotificationService
 logger = get_logger("api.notification")
 
 notification_router = APIRouter(prefix="/notification", tags=["notification"])
-health_router = APIRouter(tags=["health"])
-
-
-@health_router.get("/health", response_model=HealthResponse)
-def health_check():
-    """Health check endpoint for K8s liveness/readiness probes."""
-    return HealthResponse(
-        status="healthy",
-        service="notification-engine",
-        version="1.0.0",
-    )
 
 
 @notification_router.post("/send", response_model=SendNotificationResponse)
