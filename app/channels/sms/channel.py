@@ -5,8 +5,9 @@ Resolves SMS templates, substitutes variables, and sends via Telspiel API.
 """
 import requests
 from channels.base import BaseChannel
-from channels.sms.templates import SMS_TEMPLATES
 from core.config import settings
+from core.database import get_db_session
+from services.template_service import TemplateService
 
 
 class SMSChannel(BaseChannel):
@@ -22,25 +23,29 @@ class SMSChannel(BaseChannel):
         Load SMS template content and substitute variables from payload.
         Returns the final SMS message text.
         """
-        template = SMS_TEMPLATES.get(self.template_id)
-        if not template:
-            raise ValueError(
-                f"No SMS template found for template_id: {self.template_id}"
-            )
+        with get_db_session() as db:
+            if not db:
+                raise ValueError("Database session unavailable for SMS template resolution")
+                
+            template = TemplateService.get_sms_template(db, self.template_id)
+            if not template:
+                raise ValueError(f"No SMS template found for template_id: {self.template_id}")
 
-        try:
-            message_type = template.get("message_type", None)
-            content = template.get("content", None)
-            if content is None:
-                raise ValueError(
-                    f"No content found for SMS template '{self.template_id}'"
-                )
+            payload_keys_count = len(self.payload.keys())
+            if payload_keys_count < template.variables_count:
+                error_msg = f"Variable count mismatch for template {self.template_id}. Required at least {template.variables_count}, got {payload_keys_count}."
+                self.logger.error(error_msg, extra={"notification_id": self.notification_id})
+                raise ValueError(error_msg)
+
+            message_type = template.message_type
+            content = template.content
             
-            message = content.format(**self.payload)
-        except KeyError as e:
-            raise ValueError(
-                f"Missing variable {e} in payload for SMS template '{self.template_id}'"
-            )
+            try:
+                message = content.format(**self.payload)
+            except KeyError as e:
+                raise ValueError(
+                    f"Missing variable {e} in payload for SMS template '{self.template_id}'"
+                )
 
         self.logger.info(   
             "SMS template resolved",
