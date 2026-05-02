@@ -77,6 +77,17 @@ def send_sms_notification(
         logger.info("SMS task completed successfully", extra={**log_extra, "status": "SENT"})
         return result
 
+    except ValueError as val_err:
+        with get_db_session() as db:
+            if db:
+                NotificationService.mark_failed(
+                    db, UUID(notification_id),
+                    error_message=str(val_err),
+                    retry_count=self.request.retries,
+                )
+        logger.error(f"SMS validation failed: {val_err}", extra={**log_extra, "status": "FAILED"})
+        return {"status": "failed", "reason": "validation_error", "message": str(val_err)}
+
     except Exception as exc:
         with get_db_session() as db:
             if db:
