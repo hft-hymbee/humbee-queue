@@ -3,13 +3,19 @@ Template Service
 ================
 Handles database operations and validation for notification templates.
 """
+import json
 import string
 from typing import List, Optional
 
 from sqlalchemy.orm import Session
 
+from core.config import settings
+from core.logging import get_logger
+from core.redis_client import redis_client
 from domain.models import SMSTemplate
-from api.templates.sms.dtos import SMSTemplateCreate, SMSTemplateUpdate
+from api.templates.sms.dtos import SMSTemplateCreate, SMSTemplateUpdate, SMSTemplateResponse
+
+logger = get_logger(__name__)
 
 
 class TemplateService:
@@ -59,7 +65,40 @@ class TemplateService:
 
     @classmethod
     def get_sms_template(cls, db: Session, template_id: str) -> Optional[SMSTemplate]:
-        return db.query(SMSTemplate).filter(SMSTemplate.template_id == template_id).first()
+        # 1. Try Cache
+        cache_key = f"sms_template:{template_id}"
+        if redis_client.connection:
+            try:
+                cached_data = redis_client.connection.get(cache_key)
+                if cached_data:
+                    data = json.loads(cached_data)
+                    logger.info(f"SMS Template with ID {template_id} found in cache.")
+                    # Create an ORM-like object from cached data
+                    return SMSTemplate(**data)
+            except Exception:
+                pass # Fallback to DB on cache error
+
+        # 2. Try DB
+        template = db.query(SMSTemplate).filter(SMSTemplate.template_id == template_id).first()
+        if template:
+            logger.info(f"SMS Template with ID {template_id} found in database.")
+
+        # 3. Save to Cache
+        if template and redis_client.connection:
+            try:
+                # Use DTO to serialize
+                template_data = SMSTemplateResponse.model_validate(template).model_dump(mode="json")
+                redis_client.connection.setex(
+                    cache_key,
+                    settings.TEMPLATE_CACHE_TTL,
+                    json.dumps(template_data)
+                )
+                logger.info(f"SMS Template with ID {template_id} saved to cache.")
+            except Exception:
+                logger.error(f"SMS Template with ID {template_id} failed to save to cache.")
+                pass
+
+        return template
 
     @classmethod
     def get_all_sms_templates(cls, db: Session) -> List[SMSTemplate]:
@@ -85,4 +124,14 @@ class TemplateService:
             
         db.commit()
         db.refresh(template)
+
+        # Invalidate Cache
+        if redis_client.connection:
+            try:
+                redis_client.connection.delete(f"sms_template:{template_id}")
+                logger.info(f"SMS Template with ID {template_id} deleted from cache.")
+            except Exception:
+                logger.error(f"SMS Template with ID {template_id} failed to delete from cache.")
+                pass
+
         return template

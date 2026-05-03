@@ -43,6 +43,7 @@ class Settings:
 
         # --- Redis ---
         self.REDIS_URL: str = self._get("redis", "url", default="")
+        self.TEMPLATE_CACHE_TTL: int = int(self._get("redis", "template_cache_ttl", default="86400")) # 24 * 60 * 60 seconds
 
         # --- SMS ---
         self.SMS_API_URL: str = self._get("sms", "api_url", default="")
