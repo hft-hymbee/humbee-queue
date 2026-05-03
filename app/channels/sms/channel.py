@@ -7,6 +7,7 @@ import requests
 from channels.base import BaseChannel
 from core.config import settings
 from core.database import get_db_session
+from core.exceptions import Provider5xxError, RateLimitError
 from services.template_service import TemplateService
 
 
@@ -90,5 +91,11 @@ class SMSChannel(BaseChannel):
             settings.SMS_API_URL,
             params=params
         )
+        
+        if response.status_code == 429:
+            raise RateLimitError(f"SMS Rate Limit Exceeded: {response.text}")
+        elif response.status_code >= 500:
+            raise Provider5xxError(f"SMS Provider Server Error ({response.status_code}): {response.text}")
+            
         response.raise_for_status()
         return {"success": True, "provider": "telspiel", "response": response.json()}
