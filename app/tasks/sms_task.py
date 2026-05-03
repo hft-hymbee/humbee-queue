@@ -11,6 +11,7 @@ import requests
 from uuid import UUID
 
 from core.celery_app import celery_app
+from core.config import settings
 from core.database import get_db_session
 from core.exceptions import Provider5xxError, RateLimitError
 from core.logging import get_logger
@@ -25,7 +26,7 @@ logger = get_logger("task.sms")
     name="notification.send_sms",
     bind=True,
     acks_late=True,
-    max_retries=4,
+    max_retries=settings.NOTIFICATION_MAX_RETRIES,
     autoretry_for=(ConnectionError, TimeoutError, Provider5xxError, RateLimitError),
     retry_backoff=30,
     retry_backoff_max=1800,

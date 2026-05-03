@@ -91,6 +91,7 @@ class NotificationStatusResponse(BaseModel):
     subject: Optional[str]
     error_message: Optional[str]
     retry_count: int
+    max_retries: int
     created_at: str
     sent_at: Optional[str]
     failed_at: Optional[str]

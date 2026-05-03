@@ -63,6 +63,9 @@ class Settings:
         self.AWS_SECRET_ACCESS_KEY: str = self._get("aws", "secret_access_key", default="")
         self.AWS_REGION: str = self._get("aws", "region", default="ap-south-1")
 
+        # --- Notifications ---
+        self.NOTIFICATION_MAX_RETRIES: int = int(self._get("notifications", "max_retries", default="3"))
+
     def _get(self, group: str, key: str, default=None):
         """Get a secret value, returning default if not found."""
         try:

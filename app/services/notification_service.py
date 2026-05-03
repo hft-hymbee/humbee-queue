@@ -20,6 +20,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from core.config import settings
 from core.logging import get_logger
 from domain.enums import NotificationStatus
 from domain.models import NotificationHistory
@@ -56,6 +57,7 @@ class NotificationService:
             subject=subject,
             payload=payload,
             status=NotificationStatus.QUEUED.value,
+            max_retries=settings.NOTIFICATION_MAX_RETRIES,
             celery_task_id=celery_task_id,
         )
         db.add(record)

@@ -106,6 +106,7 @@ def get_notification_status(
         subject=record.subject,
         error_message=record.error_message,
         retry_count=record.retry_count,
+        max_retries=record.max_retries,
         created_at=record.created_at.isoformat() if record.created_at else None,
         sent_at=record.sent_at.isoformat() if record.sent_at else None,
         failed_at=record.failed_at.isoformat() if record.failed_at else None,

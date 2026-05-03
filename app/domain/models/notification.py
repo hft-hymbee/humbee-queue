@@ -14,7 +14,8 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 
 from core.database import Base
-from domain.enums import NotificationStatus, NotificationChannel
+from core.config import settings
+from domain.enums import NotificationStatus
 
 
 class NotificationHistory(Base):
@@ -38,7 +39,7 @@ class NotificationHistory(Base):
     provider_response = Column(JSONB, nullable=True)
     error_message = Column(Text, nullable=True)
     retry_count = Column(Integer, default=0)
-    max_retries = Column(Integer, default=3)
+    max_retries = Column(Integer, default=lambda: settings.NOTIFICATION_MAX_RETRIES)
     celery_task_id = Column(String(255), nullable=True)
     created_at = Column(
         DateTime(timezone=True),
