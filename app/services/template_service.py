@@ -47,6 +47,7 @@ class TemplateService:
             
         template = SMSTemplate(
             template_id=data.template_id,
+            template_name=data.template_name,
             message_type=data.message_type,
             content=data.content,
             variables_count=data.variables_count,
