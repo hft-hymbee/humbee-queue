@@ -7,10 +7,12 @@ Thin wrapper around SMSChannel. Handles:
 - Retries with exponential backoff
 """
 
+import requests
 from uuid import UUID
 
 from core.celery_app import celery_app
 from core.database import get_db_session
+from core.exceptions import Provider5xxError, RateLimitError
 from core.logging import get_logger
 from channels.sms.channel import SMSChannel
 from domain.enums import NotificationStatus
@@ -23,10 +25,10 @@ logger = get_logger("task.sms")
     name="notification.send_sms",
     bind=True,
     acks_late=True,
-    max_retries=3,
-    autoretry_for=(ConnectionError, TimeoutError),
-    retry_backoff=True,
-    retry_backoff_max=300,
+    max_retries=4,
+    autoretry_for=(ConnectionError, TimeoutError, Provider5xxError, RateLimitError),
+    retry_backoff=30,
+    retry_backoff_max=1800,
     retry_jitter=True,
 )
 def send_sms_notification(
@@ -88,14 +90,45 @@ def send_sms_notification(
         logger.error(f"SMS validation failed: {val_err}", extra={**log_extra, "status": "FAILED"})
         return {"status": "failed", "reason": "validation_error", "message": str(val_err)}
 
-    except Exception as exc:
+    except (ConnectionError, TimeoutError, Provider5xxError, RateLimitError) as exc:
+        # Mark as failed in DB to update error message and retry count
+        # Celery autoretry_for will handle the actual retry logic and backoff
         with get_db_session() as db:
             if db:
                 NotificationService.mark_failed(
                     db, UUID(notification_id),
-                    error_message=str(exc),
+                    error_message=f"Retryable error: {exc}",
+                    retry_count=self.request.retries,
+                )
+        
+        logger.warning(
+            f"SMS task failed (retryable): {exc}. Celery will autoretry. (Attempt {self.request.retries + 1}/{self.max_retries})",
+            extra={**log_extra, "retry_count": self.request.retries + 1}
+        )
+        raise exc
+
+    except requests.exceptions.RequestException as exc:
+        # Non-retryable request errors (e.g., 4xx excluding 429)
+        with get_db_session() as db:
+            if db:
+                NotificationService.mark_failed(
+                    db, UUID(notification_id),
+                    error_message=f"Non-retryable request error: {exc}",
                     retry_count=self.request.retries,
                 )
 
-        logger.error(f"SMS task failed: {exc}", extra={**log_extra, "status": "FAILED", "error_message": str(exc)})
-        raise
+        logger.error(f"SMS task failed (non-retryable): {exc}", extra={**log_extra, "status": "FAILED", "error_message": str(exc)})
+        return {"status": "failed", "error": str(exc)}
+
+    except Exception as exc:
+        # Unexpected errors
+        with get_db_session() as db:
+            if db:
+                NotificationService.mark_failed(
+                    db, UUID(notification_id),
+                    error_message=f"Unexpected error: {exc}",
+                    retry_count=self.request.retries,
+                )
+
+        logger.error(f"SMS task failed (unexpected): {exc}", extra={**log_extra, "status": "FAILED", "error_message": str(exc)})
+        raise exc
