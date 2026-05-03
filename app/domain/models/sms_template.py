@@ -15,6 +15,7 @@ class SMSTemplate(Base):
     __tablename__ = "sms_templates"
 
     template_id = Column(String(200), primary_key=True)
+    template_name = Column(String(100), nullable=False)
     message_type = Column(String(50), nullable=False)
     content = Column(Text, nullable=False)
     variables_count = Column(Integer, default=0, nullable=False)
