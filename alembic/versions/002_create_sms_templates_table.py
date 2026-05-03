@@ -18,6 +18,7 @@ def upgrade() -> None:
     op.create_table(
         "sms_templates",
         sa.Column("template_id", sa.String(length=200), nullable=False),
+        sa.Column("template_name", sa.String(length=100), nullable=False),
         sa.Column("message_type", sa.String(length=50), nullable=False),
         sa.Column("content", sa.Text(), nullable=False),
         sa.Column("variables_count", sa.Integer(), server_default="0", nullable=False),
