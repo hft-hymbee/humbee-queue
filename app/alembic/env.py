@@ -2,16 +2,12 @@
 Alembic Environment Configuration
 ==================================
 Connects Alembic to the notification engine's SQLAlchemy models.
+
 """
 
 from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 from alembic import context
-import os
-import sys
-
-# Add the app directory to sys.path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'app'))
 
 from core.config import settings
 from core.database import Base
@@ -19,7 +15,9 @@ from domain.models import *
 
 config = context.config
 
-# Set the SQLAlchemy URL from our config
+# Override the sqlalchemy.url in alembic.ini with the value from settings.
+# This means DATABASE_URL is always read from secrets.json (local) or the
+# DATABASE_URL env var (K8s), never from the hardcoded value in alembic.ini.
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 if config.config_file_name is not None:
