@@ -228,5 +228,6 @@ secrets.json
 # vscode
 .vscode
 
-# kubernetes
+# deployment
 k8s/
+ecs/
