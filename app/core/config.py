@@ -2,7 +2,7 @@
 Application Configuration
 =========================
 Central config using pydantic-settings. Values are loaded from the
-SecretsManager (secrets.json locally, K8s env vars in prod).
+SecretsManager (secrets.json locally, AWS Secrets Manager in QA/PROD).
 
 Usage:
     from core.config import settings
@@ -59,9 +59,7 @@ class Settings:
         self.WHATSAPP_SENDER_ID: str = self._get("whatsapp", "sender_id", default="")
         self.WHATSAPP_MEDIA_UPLOAD_URL: str = self._get("whatsapp", "media_upload_url", default="")
 
-        # --- AWS / S3 ---
-        self.AWS_ACCESS_KEY_ID: str = self._get("aws", "access_key_id", default="")
-        self.AWS_SECRET_ACCESS_KEY: str = self._get("aws", "secret_access_key", default="")
+        # --- AWS ---
         self.AWS_REGION: str = self._get("aws", "region", default="ap-south-1")
 
         # --- Notifications ---
