@@ -18,14 +18,11 @@ class S3Service:
 
     @staticmethod
     def get_client():
-        """Get an authenticated boto3 S3 client."""
-        if not settings.AWS_ACCESS_KEY_ID or not settings.AWS_SECRET_ACCESS_KEY:
-            logger.warning("AWS credentials not configured. S3 downloads may fail if running locally without default profile.")
-
+        """
+        Get a boto3 S3 client.
+        """
         return boto3.client(
             "s3",
-            aws_access_key_id=settings.AWS_ACCESS_KEY_ID or None,
-            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY or None,
             region_name=settings.AWS_REGION,
         )
 
