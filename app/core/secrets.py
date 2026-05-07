@@ -18,7 +18,8 @@ class SecretsManager:
     """
     Two-layer secrets management:
       ENV=LOCAL  → Load from secrets.json (gitignored)
-      ENV=PROD   → K8s Secrets mounted as environment variables
+      ENV=QA     → Load from AWS Secrets Manager: "notification-engine-qa-secret-json"
+      ENV=PROD   → Load from AWS Secrets Manager: "notification-engine-prod-secret-json"
     """
 
     def __init__(self):
@@ -33,23 +34,16 @@ class SecretsManager:
             secrets_manager.get_secret("smtp", "username")
             → reads secrets.json["smtp"]["username"]
 
-        In PROD mode, reads from environment variables:
+        In QA/PROD mode, reads from AWS Secrets Manager:
             secrets_manager.get_secret("smtp", "username")
-            → reads os.environ["SMTP_USERNAME"]
+            → reads parsed JSON secret value
         """
         if self.env == "LOCAL":
-            return self._load_from_json(group, key)
+            return self._load_from_local(group, key)
         else:
-            env_key = f"{group.upper()}_{key.upper()}"
-            value = os.environ.get(env_key)
-            if value is None:
-                raise KeyError(
-                    f"Secret not found: env var '{env_key}' is not set. "
-                    f"Ensure K8s Secret is mounted correctly."
-                )
-            return value
+            return self._load_from_aws(group, key)
 
-    def _load_from_json(self, group: str, key: str) -> Any:
+    def _load_from_local(self, group: str, key: str) -> Any:
         """Load secrets from the local secrets.json file."""
         if not self._cache:
             secrets_path = os.getenv("SECRETS_FILE_PATH", "secrets.json")
@@ -66,6 +60,41 @@ class SecretsManager:
         except KeyError:
             raise KeyError(
                 f"Secret not found: secrets.json['{group}']['{key}'] does not exist."
+            )
+
+    def _load_from_aws(self, group: str, key: str) -> Any:
+        """Load secrets from AWS Secrets Manager."""
+        if not self._cache:
+            import boto3
+            
+            secret_name_map = {
+                "QA": "notification-engine-qa-secret-json",
+                "PROD": "notification-engine-prod-secret-json",
+            }
+            
+            if self.env not in secret_name_map:
+                raise ValueError(f"Unsupported environment for AWS Secrets Manager: {self.env}")
+                
+            secret_name = secret_name_map[self.env]
+            aws_region = os.getenv("AWS_REGION", "ap-south-1")
+            
+            session = boto3.Session(region_name=aws_region)
+            client = session.client("secretsmanager")
+            
+            try:
+                response = client.get_secret_value(SecretId=secret_name)
+                secret_string = response.get("SecretString")
+                if not secret_string:
+                    raise ValueError(f"SecretString is empty for secret: {secret_name}")
+                self._cache = json.loads(secret_string)
+            except Exception as e:
+                raise RuntimeError(f"Failed to fetch secret '{secret_name}' from AWS Secrets Manager: {e}")
+
+        try:
+            return self._cache[group][key]
+        except KeyError:
+            raise KeyError(
+                f"Secret not found: AWS Secret ['{group}']['{key}'] does not exist."
             )
 
 
