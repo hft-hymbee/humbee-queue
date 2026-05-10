@@ -1,7 +1,7 @@
 """
 Alembic Environment Configuration
 ==================================
-Connects Alembic to the notification engine's SQLAlchemy models.
+Connects Alembic to the humbee queue's SQLAlchemy models.
 
 """
 
@@ -16,8 +16,7 @@ from domain.models import *
 config = context.config
 
 # Override the sqlalchemy.url in alembic.ini with the value from settings.
-# This means DATABASE_URL is always read from secrets.json (local) or the
-# DATABASE_URL env var (K8s), never from the hardcoded value in alembic.ini.
+# This means DATABASE_URL is always read from secrets.json
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 if config.config_file_name is not None:
