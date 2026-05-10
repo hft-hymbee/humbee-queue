@@ -10,7 +10,7 @@ def config_loggers(*args, **kwargs):
 
 
 celery_app = Celery(
-    "notification_engine",
+    "humbee_queue",
     broker=settings.REDIS_URL,
     backend=settings.REDIS_URL,
 )

@@ -2,7 +2,7 @@
 Secrets Manager
 ===============
 Loads secrets from either a local secrets.json file (for LOCAL development)
-or from environment variables (K8s Secrets in PROD).
+or AWS Secrets Manager (in PROD).
 
 Usage:
     from core.secrets import secrets_manager
@@ -18,8 +18,8 @@ class SecretsManager:
     """
     Two-layer secrets management:
       ENV=LOCAL  → Load from secrets.json (gitignored)
-      ENV=QA     → Load from AWS Secrets Manager: "notification-engine-qa-secret-json"
-      ENV=PROD   → Load from AWS Secrets Manager: "notification-engine-prod-secret-json"
+      ENV=QA     → Load from AWS Secrets Manager: "humbee-queue-qa-secret-json"
+      ENV=PROD   → Load from AWS Secrets Manager: "humbee-queue-prod-secret-json"
     """
 
     def __init__(self):
@@ -68,8 +68,8 @@ class SecretsManager:
             import boto3
             
             secret_name_map = {
-                "QA": "notification-engine-qa-secret-json",
-                "PROD": "notification-engine-prod-secret-json",
+                "QA": "humbee-queue-qa-secret-json",
+                "PROD": "humbee-queue-prod-secret-json",
             }
             
             if self.env not in secret_name_map:

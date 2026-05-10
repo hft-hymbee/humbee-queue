@@ -1,7 +1,7 @@
 """
 Core Exceptions
 ===============
-Custom exception classes for the notification engine.
+Custom exception classes
 """
 
 class ProviderError(Exception):
