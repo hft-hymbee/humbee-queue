@@ -15,6 +15,6 @@ def health_check():
     """Health check endpoint for monitoring liveness/readiness."""
     return HealthResponse(
         status="healthy",
-        service="notification-engine",
+        service="humbee-queue",
         version="1.0.0",
     )
