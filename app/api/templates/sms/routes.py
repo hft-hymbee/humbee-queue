@@ -8,6 +8,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from core.auth import require_admin_key, require_shared_key
 from core.database import get_db
 from core.logging import get_logger
 from services.template_service import TemplateService
@@ -23,9 +24,11 @@ logger = get_logger("api.templates.sms")
     response_model=SMSTemplateResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create a new SMS Template",
+    dependencies=[Depends(require_admin_key)],
 )
 def create_sms_template(
-    data: SMSTemplateCreate, db: Session = Depends(get_db)
+    data: SMSTemplateCreate,
+    db: Session = Depends(get_db),
 ):
     try:
         template = TemplateService.create_sms_template(db, data)
@@ -43,8 +46,11 @@ def create_sms_template(
     "",
     response_model=List[SMSTemplateResponse],
     summary="Get all SMS Templates",
+    dependencies=[Depends(require_admin_key)],
 )
-def get_all_sms_templates(db: Session = Depends(get_db)):
+def get_all_sms_templates(
+    db: Session = Depends(get_db),
+):
     return TemplateService.get_all_sms_templates(db)
 
 
@@ -52,8 +58,12 @@ def get_all_sms_templates(db: Session = Depends(get_db)):
     "/{template_id}",
     response_model=SMSTemplateResponse,
     summary="Get an SMS Template by ID",
+    dependencies=[Depends(require_shared_key)],
 )
-def get_sms_template(template_id: str, db: Session = Depends(get_db)):
+def get_sms_template(
+    template_id: str,
+    db: Session = Depends(get_db),
+):
     template = TemplateService.get_sms_template(db, template_id)
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
@@ -64,9 +74,12 @@ def get_sms_template(template_id: str, db: Session = Depends(get_db)):
     "/{template_id}",
     response_model=SMSTemplateResponse,
     summary="Update an SMS Template",
+    dependencies=[Depends(require_admin_key)],
 )
 def update_sms_template(
-    template_id: str, data: SMSTemplateUpdate, db: Session = Depends(get_db)
+    template_id: str,
+    data: SMSTemplateUpdate,
+    db: Session = Depends(get_db),
 ):
     try:
         template = TemplateService.update_sms_template(db, template_id, data)
