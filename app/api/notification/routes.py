@@ -16,6 +16,7 @@ from api.notification.dtos import (
     NotificationResult,
     NotificationStatusResponse,
 )
+from core.auth import require_admin_key, require_shared_key
 from core.database import get_db
 from core.logging import get_logger
 from services.dispatcher import NotificationDispatcher
@@ -26,7 +27,7 @@ logger = get_logger("api.notification")
 notification_router = APIRouter(prefix="/notification", tags=["notification"])
 
 
-@notification_router.post("/send", response_model=SendNotificationResponse)
+@notification_router.post("/send", response_model=SendNotificationResponse, dependencies=[Depends(require_shared_key)])
 def send_notification(
     dto: SendNotificationDTO,
     db: Session = Depends(get_db),
@@ -79,7 +80,7 @@ def send_notification(
         )
 
 
-@notification_router.get("/{notification_id}", response_model=NotificationStatusResponse)
+@notification_router.get("/{notification_id}", response_model=NotificationStatusResponse, dependencies=[Depends(require_shared_key)])
 def get_notification_status(
     notification_id: str,
     db: Session = Depends(get_db),
@@ -113,7 +114,7 @@ def get_notification_status(
     )
 
 
-@notification_router.get("/user/{user_id}")
+@notification_router.get("/user/{user_id}", dependencies=[Depends(require_admin_key)])
 def get_user_notifications(
     user_id: str,
     channel: Optional[str] = None,
