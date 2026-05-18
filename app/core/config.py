@@ -65,6 +65,12 @@ class Settings:
         # --- Notifications ---
         self.NOTIFICATION_MAX_RETRIES: int = int(self._get("notifications", "max_retries", default="3"))
 
+        # --- API Keys ---
+        self.SHARED_API_KEY: str = self._get("api_keys", "shared_key", default="")
+        self.ADMIN_KEYS: dict = self._get("api_keys", "admin_keys", default={})
+        self.ADMIN_KEY_VALUES: set = set(self.ADMIN_KEYS.values())
+        self.ADMIN_KEY_LOOKUP: dict = {v: k for k, v in self.ADMIN_KEYS.items()}
+
     def _get(self, group: str, key: str, default=None):
         """Get a secret value, returning default if not found."""
         try:
