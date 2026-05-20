@@ -88,7 +88,7 @@ class SMSChannel(BaseChannel):
         }
 
         response = requests.get(
-            settings.SMS_API_URL,
+            url=settings.SMS_API_URL,
             params=params
         )
         
