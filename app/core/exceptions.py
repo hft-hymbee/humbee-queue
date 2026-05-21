@@ -15,3 +15,7 @@ class Provider5xxError(ProviderError):
 class RateLimitError(ProviderError):
     """Raised when the provider API returns a 429 rate limit error."""
     pass
+
+class ProviderFailedError(ProviderError):
+    """Raised when the provider indicates a failure in processing the message."""
+    pass
