@@ -13,7 +13,7 @@ from uuid import UUID
 from core.celery_app import celery_app
 from core.config import settings
 from core.database import get_db_session
-from core.exceptions import Provider5xxError, RateLimitError
+from core.exceptions import Provider5xxError, RateLimitError, ProviderFailedError
 from core.logging import get_logger
 from channels.sms.channel import SMSChannel
 from domain.enums import NotificationStatus
@@ -27,7 +27,7 @@ logger = get_logger("task.sms")
     bind=True,
     acks_late=True,
     max_retries=settings.NOTIFICATION_MAX_RETRIES,
-    autoretry_for=(ConnectionError, TimeoutError, Provider5xxError, RateLimitError),
+    autoretry_for=(ConnectionError, TimeoutError, Provider5xxError, RateLimitError, ProviderFailedError),
     retry_backoff=30,
     retry_backoff_max=1800,
     retry_jitter=True,
@@ -91,7 +91,7 @@ def send_sms_notification(
         logger.error(f"SMS validation failed: {val_err}", extra={**log_extra, "status": "FAILED"})
         return {"status": "failed", "reason": "validation_error", "message": str(val_err)}
 
-    except (ConnectionError, TimeoutError, Provider5xxError, RateLimitError) as exc:
+    except (ConnectionError, TimeoutError, Provider5xxError, RateLimitError, ProviderFailedError) as exc:
         # Mark as failed in DB to update error message and retry count
         # Celery autoretry_for will handle the actual retry logic and backoff
         with get_db_session() as db:
