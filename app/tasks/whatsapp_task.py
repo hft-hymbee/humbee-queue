@@ -7,11 +7,13 @@ Thin wrapper around WhatsAppChannel. Handles:
 - Retries with exponential backoff
 """
 
+import requests
 from uuid import UUID
 
 from core.celery_app import celery_app
 from core.config import settings
 from core.database import get_db_session
+from core.exceptions import Provider5xxError, RateLimitError, ProviderFailedError
 from core.logging import get_logger
 from channels.whatsapp.channel import WhatsAppChannel
 from domain.enums import NotificationStatus
@@ -25,9 +27,9 @@ logger = get_logger("task.whatsapp")
     bind=True,
     acks_late=True,
     max_retries=settings.NOTIFICATION_MAX_RETRIES,
-    autoretry_for=(ConnectionError, TimeoutError),
-    retry_backoff=True,
-    retry_backoff_max=300,
+    autoretry_for=(ConnectionError, TimeoutError, Provider5xxError, RateLimitError, ProviderFailedError),
+    retry_backoff=30,
+    retry_backoff_max=1800,
     retry_jitter=True,
 )
 def send_whatsapp_notification(
@@ -78,16 +80,46 @@ def send_whatsapp_notification(
         logger.info("WhatsApp task completed", extra={**log_extra, "status": "SENT"})
         return result
 
-    except NotImplementedError as exc:
+    except ValueError as val_err:
         with get_db_session() as db:
             if db:
                 NotificationService.mark_failed(
                     db, UUID(notification_id),
-                    error_message=str(exc),
-                    retry_count=0,
+                    error_message=str(val_err),
+                    retry_count=self.request.retries,
                 )
-        logger.warning(f"WhatsApp provider not implemented: {exc}", extra=log_extra)
-        return {"status": "not_implemented", "error": str(exc)}
+        logger.error(f"WhatsApp validation failed: {val_err}", extra={**log_extra, "status": "FAILED"})
+        return {"status": "failed", "reason": "validation_error", "message": str(val_err)}
+
+    except (ConnectionError, TimeoutError, Provider5xxError, RateLimitError, ProviderFailedError) as exc:
+        # Mark as failed in DB to update error message and retry count
+        # Celery autoretry_for will handle the actual retry logic and backoff
+        with get_db_session() as db:
+            if db:
+                NotificationService.mark_failed(
+                    db, UUID(notification_id),
+                    error_message=f"Retryable error: {exc}",
+                    retry_count=self.request.retries,
+                )
+        
+        logger.warning(
+            f"WhatsApp task failed (retryable): {exc}. Celery will autoretry. (Attempt {self.request.retries + 1}/{self.max_retries})",
+            extra={**log_extra, "retry_count": self.request.retries + 1}
+        )
+        raise exc
+
+    except requests.exceptions.RequestException as exc:
+        # Non-retryable request errors (e.g., 4xx excluding 429)
+        with get_db_session() as db:
+            if db:
+                NotificationService.mark_failed(
+                    db, UUID(notification_id),
+                    error_message=f"Non-retryable request error: {exc}",
+                    retry_count=self.request.retries,
+                )
+
+        logger.error(f"WhatsApp task failed (non-retryable): {exc}", extra={**log_extra, "status": "FAILED", "error_message": str(exc)})
+        return {"status": "failed", "error": str(exc)}
 
     except Exception as exc:
         with get_db_session() as db:
