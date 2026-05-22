@@ -13,9 +13,15 @@ from core.config import settings
 from core.logging import get_logger
 from core.redis_client import redis_client
 from domain.models import SMSTemplate
-from api.templates.sms.dtos import SMSTemplateCreate, SMSTemplateUpdate, SMSTemplateResponse
+from api.templates.sms.dtos import (
+    SMSTemplateCreate,
+    SMSTemplateUpdate,
+    SMSTemplateResponse,
+)
 
 logger = get_logger(__name__)
+
+CACHE_KEY_PREFIX = "sms_template"
 
 
 class SmsTemplateService:
@@ -66,7 +72,7 @@ class SmsTemplateService:
     @classmethod
     def get_sms_template(cls, db: Session, template_id: str) -> Optional[SMSTemplate]:
         # 1. Try Cache
-        cache_key = f"sms_template:{template_id}"
+        cache_key = f"{CACHE_KEY_PREFIX}:{template_id}"
         if redis_client.connection:
             try:
                 cached_data = redis_client.connection.get(cache_key)
@@ -128,7 +134,7 @@ class SmsTemplateService:
         # Invalidate Cache
         if redis_client.connection:
             try:
-                redis_client.connection.delete(f"sms_template:{template_id}")
+                redis_client.connection.delete(f"{CACHE_KEY_PREFIX}:{template_id}")
                 logger.info(f"SMS Template with ID {template_id} deleted from cache.")
             except Exception:
                 logger.error(f"SMS Template with ID {template_id} failed to delete from cache.")
