@@ -1,7 +1,7 @@
 """
-Template Service
-================
-Handles database operations and validation for notification templates.
+SMS Template Service
+====================
+Handles database operations and validation for SMS templates.
 """
 import json
 import string
@@ -18,7 +18,7 @@ from api.templates.sms.dtos import SMSTemplateCreate, SMSTemplateUpdate, SMSTemp
 logger = get_logger(__name__)
 
 
-class TemplateService:
+class SmsTemplateService:
 
     @staticmethod
     def validate_template_variables(content: str, expected_count: int):
