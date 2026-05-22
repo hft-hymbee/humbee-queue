@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from core.auth import require_admin_key, require_shared_key
 from core.database import get_db
 from core.logging import get_logger
-from services.template_service import TemplateService
+from services.sms_template_service import SmsTemplateService
 from api.templates.sms.dtos import SMSTemplateCreate, SMSTemplateUpdate, SMSTemplateResponse
 
 
@@ -31,7 +31,7 @@ def create_sms_template(
     db: Session = Depends(get_db),
 ):
     try:
-        template = TemplateService.create_sms_template(db, data)
+        template = SmsTemplateService.create_sms_template(db, data)
         logger.info(f"Created SMS template: {template.template_id}")
         return template
     except ValueError as e:
@@ -51,7 +51,7 @@ def create_sms_template(
 def get_all_sms_templates(
     db: Session = Depends(get_db),
 ):
-    return TemplateService.get_all_sms_templates(db)
+    return SmsTemplateService.get_all_sms_templates(db)
 
 
 @router.get(
@@ -64,7 +64,7 @@ def get_sms_template(
     template_id: str,
     db: Session = Depends(get_db),
 ):
-    template = TemplateService.get_sms_template(db, template_id)
+    template = SmsTemplateService.get_sms_template(db, template_id)
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
     return template
@@ -82,7 +82,7 @@ def update_sms_template(
     db: Session = Depends(get_db),
 ):
     try:
-        template = TemplateService.update_sms_template(db, template_id, data)
+        template = SmsTemplateService.update_sms_template(db, template_id, data)
         if not template:
             raise HTTPException(status_code=404, detail="Template not found")
         logger.info(f"Updated SMS template: {template_id}")
