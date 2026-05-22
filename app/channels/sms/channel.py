@@ -8,7 +8,7 @@ from channels.base import BaseChannel
 from core.config import settings
 from core.database import get_db_session
 from core.exceptions import Provider5xxError, RateLimitError, ProviderFailedError
-from services.template_service import TemplateService
+from services.sms_template_service import SmsTemplateService
 
 
 class SMSChannel(BaseChannel):
@@ -28,7 +28,7 @@ class SMSChannel(BaseChannel):
             if not db:
                 raise ValueError("Database session unavailable for SMS template resolution")
                 
-            template = TemplateService.get_sms_template(db, self.template_id)
+            template = SmsTemplateService.get_sms_template(db, self.template_id)
             if not template:
                 raise ValueError(f"No SMS template found for template_id: {self.template_id}")
 
