@@ -3,7 +3,6 @@ WhatsApp Template ORM Model
 ============================
 Database-backed templates for WhatsApp channel.
 
-The template_id stores the TelSpiel provider template ID directly.
 variables_map maps human-readable variable names to positional indices ("0", "1", ...)
 as required by the TelSpiel API's parameterValues dict.
 """
