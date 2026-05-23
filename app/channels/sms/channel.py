@@ -14,7 +14,7 @@ from services.sms_template_service import SmsTemplateService
 class SMSChannel(BaseChannel):
     """
     SMS notification channel using Telspiel provider.
-    Template content is stored locally; variables substituted at runtime.
+    Template content is stored in the DB; variables substituted at runtime.
     """
 
     channel_name = "sms"
