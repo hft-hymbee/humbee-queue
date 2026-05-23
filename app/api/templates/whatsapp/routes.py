@@ -2,7 +2,6 @@
 WhatsApp Template API Routes
 =============================
 Endpoints to manage WhatsApp templates.
-Auth will be added after WhatsApp notification testing is complete.
 """
 
 from typing import List
