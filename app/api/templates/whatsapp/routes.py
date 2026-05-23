@@ -8,14 +8,11 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from core.auth import require_admin_key, require_shared_key
 from core.database import get_db
 from core.logging import get_logger
 from services.whatsapp_template_service import WhatsAppTemplateService
-from api.templates.whatsapp.dtos import (
-    WhatsAppTemplateCreate,
-    WhatsAppTemplateUpdate,
-    WhatsAppTemplateResponse,
-)
+from api.templates.whatsapp.dtos import WhatsAppTemplateCreate, WhatsAppTemplateUpdate, WhatsAppTemplateResponse
 
 
 router = APIRouter(prefix="/whatsapp", tags=["WhatsApp Templates"])
@@ -27,6 +24,7 @@ logger = get_logger("api.templates.whatsapp")
     response_model=WhatsAppTemplateResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create a new WhatsApp Template",
+    dependencies=[Depends(require_admin_key)],
 )
 def create_whatsapp_template(
     data: WhatsAppTemplateCreate,
@@ -48,6 +46,7 @@ def create_whatsapp_template(
     "",
     response_model=List[WhatsAppTemplateResponse],
     summary="Get all WhatsApp Templates",
+    dependencies=[Depends(require_admin_key)],
 )
 def get_all_whatsapp_templates(
     db: Session = Depends(get_db),
@@ -59,6 +58,7 @@ def get_all_whatsapp_templates(
     "/{template_id}",
     response_model=WhatsAppTemplateResponse,
     summary="Get a WhatsApp Template by ID",
+    dependencies=[Depends(require_shared_key)],
 )
 def get_whatsapp_template(
     template_id: str,
@@ -74,6 +74,7 @@ def get_whatsapp_template(
     "/{template_id}",
     response_model=WhatsAppTemplateResponse,
     summary="Update a WhatsApp Template",
+    dependencies=[Depends(require_admin_key)],
 )
 def update_whatsapp_template(
     template_id: str,
