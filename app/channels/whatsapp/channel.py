@@ -1,123 +1,251 @@
 """
 WhatsApp Channel
 ================
-Resolves WhatsApp template IDs and sends via WhatsApp aggregator API.
+Resolves WhatsApp templates from the database, translates named variables
+to positional indices required by TelSpiel, validates media presence,
+and sends via the TelSpiel aggregator API.
 
-NOTE: The actual aggregator API integration (send() method body) is a TODO.
-      The template resolution and all surrounding logic is implemented.
+Request body shapes:
+
+Case A — Text-only template:
+{
+  "from": "919311693267",
+  "to": "919XXXXXXXXX",
+  "journeyId": "...",
+  "message": {
+    "template": {
+      "templateId": "01jqxrs53wpewhjn3yyvmvawta",
+      "parameterValues": {"0": "Acme", "1": "INV-001"}
+    }
+  }
+}
+
+Case B — Media template (DOC / IMAGE / VIDEO):
+{
+  "from": "919311693267",
+  "to": "919XXXXXXXXX",
+  "journeyId": "...",
+  "message": {
+    "template": {
+      "templateId": "01jqxjpwyv6wjrjn4w3twdg65y",
+      "parameterValues": {"0": "Acme", "1": "INV-001"},
+      "media": {
+        "type": "DOC",
+        "url": "https://...",
+        "fileName": "invoice.pdf"
+      }
+    }
+  }
+}
 """
 import requests
 from channels.base import BaseChannel
-from channels.whatsapp.templates import WA_TEMPLATES
-from services.s3_service import S3Service
 from core.config import settings
+from core.database import get_db_session
+from core.exceptions import Provider5xxError, RateLimitError, ProviderFailedError
+from services.whatsapp_template_service import WhatsAppTemplateService
 
 
 class WhatsAppChannel(BaseChannel):
     """
-    WhatsApp notification channel.
-    Template ID is resolved locally; the provider manages template content.
-    Variables are passed to the provider API at send time.
+    WhatsApp notification channel using TelSpiel aggregator.
+
+    Template metadata (variables_map, has_media, media_type) is stored in the DB.
+    The actual message content lives on the TelSpiel platform — we only pass the
+    template ID + resolved parameter values + optional media details.
     """
 
     channel_name = "whatsapp"
 
-    def resolve_template(self) -> str:
+    def resolve_template(self):
         """
-        Resolve the WhatsApp provider template ID from internal template_id.
-        Returns the provider-side template ID string.
+        Load WhatsApp template metadata from the database (with Redis caching).
+        Returns the WhatsAppTemplate ORM object.
+        Raises ValueError if no template is found for self.template_id.
         """
-        wa_template_config = WA_TEMPLATES.get(self.template_id)
-        if not wa_template_config:
-            raise ValueError(
-                f"No WhatsApp template found for template_id: {self.template_id}"
-            )
+        with get_db_session() as db:
+            if not db:
+                raise ValueError(
+                    "Database session unavailable for WhatsApp template resolution"
+                )
 
-        provider_template_id = wa_template_config["provider_template_id"]
+            template = WhatsAppTemplateService.get_whatsapp_template(db, self.template_id)
+            if not template:
+                raise ValueError(
+                    f"No WhatsApp template found for template_id: '{self.template_id}'"
+                )
 
         self.logger.info(
-            f"WhatsApp template resolved: {self.template_id} → {provider_template_id}",
+            f"WhatsApp template resolved: '{self.template_id}'",
             extra={
                 "notification_id": self.notification_id,
                 "template_id": self.template_id,
                 "channel": "WHATSAPP",
+                "has_media": template.has_media,
             },
         )
-        return provider_template_id
+        return template
 
-    def _upload_media_to_provider(self, file_data: dict) -> str:
-        """Upload raw file bytes to the WhatsApp aggregator and return the public URL."""
-        if not settings.WHATSAPP_MEDIA_UPLOAD_URL:
-            self.logger.warning("WHATSAPP_MEDIA_UPLOAD_URL not configured. Skipping attachment upload.")
-            return ""
+    def _resolve_variables(self, template) -> dict:
+        """
+        Translate named payload variables to the positional dict required by TelSpiel.
 
-        upload_resp = requests.post(
-            settings.WHATSAPP_MEDIA_UPLOAD_URL,
-            headers={"Authorization": f"Bearer {settings.WHATSAPP_API_KEY}"},
-            files={"file": (file_data["filename"], file_data["bytes"])}
-        )
-        upload_resp.raise_for_status()
+        template.variables_map: {"buyer_name": "0", "invoice_no": "1", ...}
+        self.payload:           {"buyer_name": "Acme", "invoice_no": "INV-001", ...}
+        result:                 {"0": "Acme", "1": "INV-001", ...}
 
-        # Extract the public URL from provider response (adjust key based on provider docs)
-        public_url = upload_resp.json().get("media_url") or upload_resp.json().get("url")
-        return public_url or ""
+        Returns an empty dict if the template has no variables.
+        Raises ValueError if a required variable is missing from the payload.
+        """
+        if template.variables_count == 0:
+            return {}
 
-    def _process_media_attachments(self, wa_template_config: dict) -> list:
-        """Download attachments from S3 and upload to provider."""
-        media_urls = []
-        if not wa_template_config.get("has_attachment"):
-            return media_urls
+        parameter_values = {}
+        for name, position in template.variables_map.items():
+            if name not in self.payload:
+                raise ValueError(
+                    f"Missing required variable '{name}' for WhatsApp template '{self.template_id}'. "
+                    f"Expected variables: {list(template.variables_map.keys())}"
+                )
+            parameter_values[position] = self.payload[name]
 
-        payload_keys = wa_template_config.get("attachment_payload_keys", [])
-        for key in payload_keys:
-            s3_url = self.payload.get(key)
-            if s3_url:
-                file_data = S3Service.download_file(s3_url)
-                public_url = self._upload_media_to_provider(file_data)
-                if public_url:
-                    media_urls.append(public_url)
+        return parameter_values
 
-        return media_urls
+    def _resolve_media(self, template) -> dict | None:
+        """
+        Validate and extract media details from payload["media"].
+
+        Rules:
+        - has_media=False + payload has "media" key  → ValueError (text-only template)
+        - has_media=True  + payload missing "media"  → ValueError (media required)
+        - has_media=True  + media present            → validate url/type/file_name + type match
+        - has_media=False + no media in payload      → return None
+
+        Expected payload["media"] shape:
+        {
+            "url":       "https://...",
+            "type":      "DOC" | "IMAGE" | "VIDEO",
+            "file_name": "invoice.pdf"
+        }
+
+        Returns a dict formatted for TelSpiel's media block, or None.
+        """
+        client_media = self.payload.get("media")
+
+        if not template.has_media:
+            if client_media:
+                raise ValueError(
+                    f"Template '{self.template_id}' is a text-only template but "
+                    f"media details were provided in the payload. Remove the 'media' key."
+                )
+            return None
+
+        # Template requires media
+        if not client_media:
+            raise ValueError(
+                f"Template '{self.template_id}' requires media (type: {template.media_type}) "
+                f"but the 'media' key is missing from the payload."
+            )
+
+        media_url = client_media.get("url")
+        media_type = client_media.get("type")
+        media_filename = client_media.get("file_name")
+
+        if not all([media_url, media_type, media_filename]):
+            missing = [
+                k for k, v in {
+                    "url": media_url, "type": media_type, "file_name": media_filename
+                }.items() if not v
+            ]
+            raise ValueError(
+                f"Incomplete media payload for template '{self.template_id}'. "
+                f"Missing fields: {missing}. Required: 'url', 'type', 'file_name'."
+            )
+
+        if media_type != template.media_type:
+            raise ValueError(
+                f"Media type mismatch for template '{self.template_id}': "
+                f"template expects '{template.media_type}', payload provided '{media_type}'."
+            )
+
+        return {
+            "type": media_type,
+            "url": media_url,
+            "fileName": media_filename,
+        }
+
+    def _get_template_data(self, template, parameter_values: dict, media: dict | None) -> dict:
+        """Build the 'template' sub-object for the TelSpiel request body."""
+        template_data = {"templateId": template.template_id}
+
+        if parameter_values:
+            template_data["parameterValues"] = parameter_values
+
+        if media:
+            template_data["media"] = media
+
+        return template_data
+
+    def _request_body(self, template, parameter_values: dict, media: dict | None) -> dict:
+        """Assemble the full TelSpiel POST request body."""
+        return {
+            "from": f"91{settings.WHATSAPP_ADMIN_PHONE_NO}",
+            "to": f"91{self.recipient}",
+            "journeyId": settings.WHATSAPP_JOURNEY_ID,
+            "message": {
+                "template": self._get_template_data(template, parameter_values, media)
+            },
+        }
+
+    def _get_default_headers(self) -> dict:
+        return {
+            "Content-Type": "application/json",
+            settings.WHATSAPP_AUTHENTICATION_TYPE: settings.WHATSAPP_LONG_TERM_TOKEN,
+        }
 
     def send(self) -> dict:
         """
-        Resolve template ID, process attachments, and send WhatsApp message via aggregator.
+        Resolve template metadata, validate and translate variables + media,
+        then POST to TelSpiel.
 
         Returns:
             dict with provider response
+        Raises:
+            ValueError       — validation failures (missing vars, media mismatch, etc.)
+            RateLimitError   — HTTP 429 from provider
+            Provider5xxError — HTTP 5xx from provider
+            ProviderFailedError — non-success response body from provider
         """
-        wa_template_id = self.resolve_template()
-        wa_template_config = WA_TEMPLATES.get(self.template_id)
-        
-        variables = dict(self.payload)
-        
-        # Handle Attachments via S3 -> Aggregator Upload
-        media_urls = self._process_media_attachments(wa_template_config)
-        
-        # Inject media URLs into payload variables if they exist
-        if media_urls:
-            variables["media_urls"] = media_urls
+        template = self.resolve_template()
+        parameter_values = self._resolve_variables(template)
+        media = self._resolve_media(template)
 
         self.logger.info(
-            f"Sending WhatsApp via aggregator API",
+            f"Sending WhatsApp to {self.recipient}",
             extra={
                 "notification_id": self.notification_id,
                 "channel": "WHATSAPP",
                 "template_id": self.template_id,
                 "recipient": self.recipient,
-                "has_media": bool(media_urls)
+                "has_media": bool(media),
+                "variables_count": template.variables_count,
             },
         )
-        
+
         response = requests.post(
-            settings.WHATSAPP_API_URL,
-            headers={"Authorization": f"Bearer {settings.WHATSAPP_API_KEY}"},
-            json={
-                "phone": self.recipient,
-                "template_id": wa_template_id,
-                "variables": variables,
-                "sender_id": settings.WHATSAPP_SENDER_ID,
-            },
+            url=settings.WHATSAPP_API_URL,
+            headers=self._get_default_headers(),
+            json=self._request_body(template, parameter_values, media),
         )
+
+        if response.status_code == 429:
+            raise RateLimitError(
+                f"WhatsApp Rate Limit Exceeded: {response.text}"
+            )
+        elif response.status_code >= 500:
+            raise Provider5xxError(
+                f"WhatsApp Provider Server Error ({response.status_code}): {response.text}"
+            )
+
         response.raise_for_status()
-        return {"success": True, "provider": "whatsapp_aggregator", "response": response.json()}
+        return {"success": True, "provider": "tellix", "response": response.json()}
