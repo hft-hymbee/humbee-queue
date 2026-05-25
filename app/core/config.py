@@ -56,7 +56,7 @@ class Settings:
         # --- WhatsApp ---
         self.WHATSAPP_API_URL: str = self._get("whatsapp", "api_url", default="")
         self.WHATSAPP_AUTHENTICATION_TYPE: str = self._get("whatsapp", "authentication_type", default="")
-        self.WHATSAPP_LONG_TERM_TOKEN: str = self._get("whatsapp", "sender_idlong_term_token", default="")
+        self.WHATSAPP_LONG_TERM_TOKEN: str = self._get("whatsapp", "long_term_token", default="")
         self.WHATSAPP_JOURNEY_ID: str = self._get("whatsapp", "journey_id", default="")
         self.WHATSAPP_ADMIN_PHONE_NO: str = self._get("whatsapp", "admin_phone_no", default="")
 
