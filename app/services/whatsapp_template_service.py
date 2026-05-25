@@ -33,11 +33,19 @@ class WhatsAppTemplateService:
     @staticmethod
     def validate_variables_count(variables_map: dict, variables_count: int):
         """
-        Validates that the number of variables in variables_map matches variables_count.
+        Validates that the total number of positional slots in variables_map matches variables_count.
+
+        Each variable's value may be a single position string ("0") or a list of positions (["0", "3"]).
+        The sum of all positions — not the number of unique variable names — must equal variables_count.
         """
-        if len(variables_map) != variables_count:
+        total_positions = sum(
+            len(v) if isinstance(v, list) else 1
+            for v in variables_map.values()
+        )
+        if total_positions != variables_count:
             raise ValueError(
-                f"Invalid variables_count. Expected: {len(variables_map)}, got: {variables_count}"
+                f"Invalid variables_count. variables_map resolves to {total_positions} total "
+                f"position(s), but variables_count is {variables_count}. They must match."
             )
 
     @staticmethod
