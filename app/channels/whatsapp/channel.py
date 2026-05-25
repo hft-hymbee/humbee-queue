@@ -13,7 +13,7 @@ Case A — Text-only template:
   "message": {
     "template": {
       "templateId": "template_id_1",
-      "parameterValues": {"0": "ABC", "1": "INV-001"}
+      "parameterValues": {"0": "ABC", "1": "INV-001", "3": "ABC"}
     }
   }
 }
@@ -83,9 +83,12 @@ class WhatsAppChannel(BaseChannel):
         """
         Translate named payload variables to the positional dict required by TelSpiel.
 
-        template.variables_map: {"buyer_name": "0", "invoice_no": "1", ...}
-        self.payload:           {"buyer_name": "Acme", "invoice_no": "INV-001", ...}
-        result:                 {"0": "Acme", "1": "INV-001", ...}
+        template.variables_map: {"buyer_name": ["0", "3"], "invoice_no": ["1"]}
+        self.payload:           {"buyer_name": "Acme", "invoice_no": "INV-001"}
+        result:                 {"0": "Acme", "1": "INV-001", "3": "Acme"}
+
+        A variable whose value is a list of positions will have its payload value
+        written to every one of those positions (fan-out).
 
         Returns an empty dict if the template has no variables.
         Raises ValueError if a required variable is missing from the payload.
@@ -94,13 +97,15 @@ class WhatsAppChannel(BaseChannel):
             return {}
 
         parameter_values = {}
-        for name, position in template.variables_map.items():
+        for name, positions in template.variables_map.items():
             if name not in self.payload:
                 raise ValueError(
                     f"Missing required variable '{name}' for WhatsApp template '{self.template_id}'. "
                     f"Expected variables: {list(template.variables_map.keys())}"
                 )
-            parameter_values[position] = self.payload[name]
+            value = self.payload[name]
+            for position in positions:
+                parameter_values[position] = value
 
         return parameter_values
 
