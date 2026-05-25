@@ -42,6 +42,7 @@ from core.config import settings
 from core.database import get_db_session
 from core.exceptions import Provider5xxError, RateLimitError, ProviderFailedError
 from services.whatsapp_template_service import WhatsAppTemplateService
+from api.templates.whatsapp.dtos import WhatsAppTemplateResponse
 
 
 class WhatsAppChannel(BaseChannel):
@@ -55,11 +56,18 @@ class WhatsAppChannel(BaseChannel):
 
     channel_name = "whatsapp"
 
-    def resolve_template(self):
+    def resolve_template(self) -> "WhatsAppTemplateResponse":
         """
-        Load WhatsApp template metadata from the database.
-        Returns the WhatsAppTemplate ORM object.
+        Load WhatsApp template metadata from the database and return it as a
+        Pydantic response model.
+
+        Returning a Pydantic model (not the raw ORM object) is intentional: the
+        DB session is closed when the `with` block exits, and accessing ORM
+        attributes after that raises a DetachedInstanceError. Converting inside
+        the session eagerly loads all fields into a plain Python object that is
+        safe to use after the session closes.
         """
+
         with get_db_session() as db:
             if not db:
                 raise ValueError("Database session unavailable for WhatsApp template resolution")
@@ -68,16 +76,20 @@ class WhatsAppChannel(BaseChannel):
             if not template:
                 raise ValueError(f"No WhatsApp template found for template_id: '{self.template_id}'")
 
+            # Materialize template to a Pydantic model to avoid DetachedInstanceError
+            # since DB session is closed after this function call
+            template_response = WhatsAppTemplateResponse.model_validate(template)
+
         self.logger.info(
             f"WhatsApp template resolved: '{self.template_id}'",
             extra={
                 "notification_id": self.notification_id,
                 "template_id": self.template_id,
                 "channel": "WHATSAPP",
-                "has_media": template.has_media,
+                "has_media": template_response.has_media,
             },
         )
-        return template
+        return template_response
 
     def _resolve_variables(self, template) -> dict:
         """
@@ -230,13 +242,13 @@ class WhatsAppChannel(BaseChannel):
         )
 
         if response.status_code == 429:
-            raise RateLimitError(
-                f"WhatsApp Rate Limit Exceeded: {response.text}"
-            )
+            raise RateLimitError(f"WhatsApp Rate Limit Exceeded: {response.text}")
         elif response.status_code >= 500:
-            raise Provider5xxError(
-                f"WhatsApp Provider Server Error ({response.status_code}): {response.text}"
-            )
+            raise Provider5xxError(f"WhatsApp Provider Server Error ({response.status_code}): {response.text}")
+
+        json_response = response.json()
+        if json_response.get("code", None) != "100":
+            raise ProviderFailedError(f"Whatsapp Provider Failed to Process Message: {json_response}")
 
         response.raise_for_status()
-        return {"success": True, "provider": "tellix", "response": response.json()}
+        return {"success": True, "provider": "tellix", "response": json_response}
