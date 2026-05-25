@@ -5,6 +5,9 @@ Database-backed templates for WhatsApp channel.
 
 variables_map maps human-readable variable names to positional indices ("0", "1", ...)
 as required by the TelSpiel API's parameterValues dict.
+
+A variable may map to a single position ("0") or multiple positions (["0", "3"]).
+Single strings are normalised to lists by the DTO validator at write time.
 """
 
 from datetime import datetime, timezone
@@ -25,7 +28,7 @@ class WhatsAppTemplate(Base):
         JSONB,
         nullable=False,
         default=dict,
-        comment='{"buyer_name": "0", "invoice_no": "1", ...}',
+        comment='{"buyer_name": ["0", "3"], "invoice_no": ["1"], ...} — values are lists of positional indices',
     )
     has_media = Column(Boolean, default=False, nullable=False)
     media_type = Column(
