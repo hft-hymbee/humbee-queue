@@ -1,34 +1,32 @@
 """
 WhatsApp Channel
 ================
-Resolves WhatsApp templates from the database, translates named variables
-to positional indices required by TelSpiel, validates media presence,
-and sends via the TelSpiel aggregator API.
+Validates data against template metadata and sends messages via the Telspiel API.
 
 Request body shapes:
 
 Case A — Text-only template:
 {
-  "from": "919311693267",
+  "from": "919XXXXXXXXX",
   "to": "919XXXXXXXXX",
   "journeyId": "...",
   "message": {
     "template": {
-      "templateId": "01jqxrs53wpewhjn3yyvmvawta",
-      "parameterValues": {"0": "Acme", "1": "INV-001"}
+      "templateId": "template_id_1",
+      "parameterValues": {"0": "ABC", "1": "INV-001"}
     }
   }
 }
 
 Case B — Media template (DOC / IMAGE / VIDEO):
 {
-  "from": "919311693267",
+  "from": "919XXXXXXXXX",
   "to": "919XXXXXXXXX",
   "journeyId": "...",
   "message": {
     "template": {
-      "templateId": "01jqxjpwyv6wjrjn4w3twdg65y",
-      "parameterValues": {"0": "Acme", "1": "INV-001"},
+      "templateId": "template_id",
+      "parameterValues": {"0": "ABC", "1": "INV-001"},
       "media": {
         "type": "DOC",
         "url": "https://...",
@@ -48,7 +46,7 @@ from services.whatsapp_template_service import WhatsAppTemplateService
 
 class WhatsAppChannel(BaseChannel):
     """
-    WhatsApp notification channel using TelSpiel aggregator.
+    WhatsApp notification channel using TelSpiel provider.
 
     Template metadata (variables_map, has_media, media_type) is stored in the DB.
     The actual message content lives on the TelSpiel platform — we only pass the
@@ -59,21 +57,16 @@ class WhatsAppChannel(BaseChannel):
 
     def resolve_template(self):
         """
-        Load WhatsApp template metadata from the database (with Redis caching).
+        Load WhatsApp template metadata from the database.
         Returns the WhatsAppTemplate ORM object.
-        Raises ValueError if no template is found for self.template_id.
         """
         with get_db_session() as db:
             if not db:
-                raise ValueError(
-                    "Database session unavailable for WhatsApp template resolution"
-                )
+                raise ValueError("Database session unavailable for WhatsApp template resolution")
 
             template = WhatsAppTemplateService.get_whatsapp_template(db, self.template_id)
             if not template:
-                raise ValueError(
-                    f"No WhatsApp template found for template_id: '{self.template_id}'"
-                )
+                raise ValueError(f"No WhatsApp template found for template_id: '{self.template_id}'")
 
         self.logger.info(
             f"WhatsApp template resolved: '{self.template_id}'",
@@ -113,15 +106,15 @@ class WhatsAppChannel(BaseChannel):
 
     def _resolve_media(self, template) -> dict | None:
         """
-        Validate and extract media details from payload["media"].
+        Validate and extract media details from payload["media_payload"].
 
         Rules:
-        - has_media=False + payload has "media" key  → ValueError (text-only template)
-        - has_media=True  + payload missing "media"  → ValueError (media required)
+        - has_media=False + payload has "media_payload" key  → ValueError (text-only template)
+        - has_media=True  + payload missing "media_payload"  → ValueError (media required)
         - has_media=True  + media present            → validate url/type/file_name + type match
         - has_media=False + no media in payload      → return None
 
-        Expected payload["media"] shape:
+        Expected payload["media_payload"] shape:
         {
             "url":       "https://...",
             "type":      "DOC" | "IMAGE" | "VIDEO",
@@ -130,13 +123,13 @@ class WhatsAppChannel(BaseChannel):
 
         Returns a dict formatted for TelSpiel's media block, or None.
         """
-        client_media = self.payload.get("media")
+        client_media = self.payload.get("media_payload")
 
         if not template.has_media:
             if client_media:
                 raise ValueError(
                     f"Template '{self.template_id}' is a text-only template but "
-                    f"media details were provided in the payload. Remove the 'media' key."
+                    f"media details were provided in the payload. Remove the 'media_payload' key."
                 )
             return None
 
@@ -144,7 +137,7 @@ class WhatsAppChannel(BaseChannel):
         if not client_media:
             raise ValueError(
                 f"Template '{self.template_id}' requires media (type: {template.media_type}) "
-                f"but the 'media' key is missing from the payload."
+                f"but the 'media_payload' key is missing from the payload."
             )
 
         media_url = client_media.get("url")
@@ -206,15 +199,10 @@ class WhatsAppChannel(BaseChannel):
     def send(self) -> dict:
         """
         Resolve template metadata, validate and translate variables + media,
-        then POST to TelSpiel.
+        then send WHATSAPP via TelSpiel.
 
         Returns:
             dict with provider response
-        Raises:
-            ValueError       — validation failures (missing vars, media mismatch, etc.)
-            RateLimitError   — HTTP 429 from provider
-            Provider5xxError — HTTP 5xx from provider
-            ProviderFailedError — non-success response body from provider
         """
         template = self.resolve_template()
         parameter_values = self._resolve_variables(template)
@@ -225,10 +213,8 @@ class WhatsAppChannel(BaseChannel):
             extra={
                 "notification_id": self.notification_id,
                 "channel": "WHATSAPP",
-                "template_id": self.template_id,
                 "recipient": self.recipient,
                 "has_media": bool(media),
-                "variables_count": template.variables_count,
             },
         )
 
