@@ -247,7 +247,7 @@ class WhatsAppChannel(BaseChannel):
             raise Provider5xxError(f"WhatsApp Provider Server Error ({response.status_code}): {response.text}")
 
         json_response = response.json()
-        if json_response.get("code", None) != "100":
+        if json_response.get("code", None) != 100:
             raise ProviderFailedError(f"Whatsapp Provider Failed to Process Message: {json_response}")
 
         response.raise_for_status()
