@@ -1,8 +1,8 @@
 """
-InApp Channel
-=============
-In-app notification channel. Currently DB-only: the notification_history
-record itself IS the in-app notification.
+Push Channel
+============
+Push notification channel. Currently DB-only: the notification_history
+record itself IS the push notification.
 
 Phase 2: Add WebSocket push or FCM for real-time delivery.
 """
@@ -10,14 +10,14 @@ Phase 2: Add WebSocket push or FCM for real-time delivery.
 from channels.base import BaseChannel
 
 
-class InAppChannel(BaseChannel):
+class PushChannel(BaseChannel):
     """
-    In-App notification channel.
+    Push notification channel.
     Currently stores to DB only (via notification_history).
     The frontend polls or queries the notifications endpoint.
     """
 
-    channel_name = "inapp"
+    channel_name = "push"
 
     def resolve_template(self) -> str:
         """
@@ -34,10 +34,10 @@ class InAppChannel(BaseChannel):
         Phase 2: Add WebSocket push / Firebase Cloud Messaging here.
         """
         self.logger.info(
-            "InApp notification stored (DB-only)",
+            "Push notification stored (DB-only)",
             extra={
                 "notification_id": self.notification_id,
-                "channel": "INAPP",
+                "channel": "PUSH",
                 "user_id": self.payload.get("user_id"),
             },
         )
