@@ -82,16 +82,16 @@ services:
       - redis
       - postgres
 
-  # ─── InApp Worker ───────────────────────────────────────────────
-  inapp_worker:
-    hostname: inapp_worker
+  # ─── Push Worker ────────────────────────────────────────────────
+  push_worker:
+    hostname: push_worker
     build:
       context: .
       dockerfile: Dockerfile
     ports:
       - "5682:5682"
-    command: python -m debugpy --listen 0.0.0.0:5682 -m celery -A core.celery_app:celery_app worker -Q inapp_queue -c 2 --loglevel=info
-    # command: python -m debugpy --listen 0.0.0.0:5682 -m celery -A core.celery_app:celery_app worker -Q inapp_queue --pool=solo --loglevel=info
+    command: python -m debugpy --listen 0.0.0.0:5682 -m celery -A core.celery_app:celery_app worker -Q push_queue -c 2 --loglevel=info
+    # command: python -m debugpy --listen 0.0.0.0:5682 -m celery -A core.celery_app:celery_app worker -Q push_queue --pool=solo --loglevel=info
     environment:
       - ENV=LOCAL
       - PYTHONUNBUFFERED=1
