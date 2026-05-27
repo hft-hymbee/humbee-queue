@@ -6,7 +6,7 @@ class NotificationChannel(str, Enum):
     EMAIL = "EMAIL"
     SMS = "SMS"
     WHATSAPP = "WHATSAPP"
-    INAPP = "INAPP"
+    PUSH = "PUSH"
 
 
 class NotificationStatus(str, Enum):
