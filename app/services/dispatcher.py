@@ -35,7 +35,7 @@ CHANNEL_TASK_MAP = {
     NotificationChannel.EMAIL: "notification.send_email",
     NotificationChannel.SMS: "notification.send_sms",
     NotificationChannel.WHATSAPP: "notification.send_whatsapp",
-    NotificationChannel.INAPP: "notification.send_inapp",
+    NotificationChannel.PUSH: "notification.send_push",
 }
 
 # Channel enum → Celery queue name
@@ -43,7 +43,7 @@ CHANNEL_QUEUE_MAP = {
     NotificationChannel.EMAIL: "email_queue",
     NotificationChannel.SMS: "sms_queue",
     NotificationChannel.WHATSAPP: "whatsapp_queue",
-    NotificationChannel.INAPP: "inapp_queue",
+    NotificationChannel.PUSH: "push_queue",
 }
 
 
@@ -77,7 +77,7 @@ class NotificationDispatcher:
             template_id: Template identifier
             payload: Notification payload
             user_id: Optional user ID for tracking
-            subject: Optional subject line (email/inapp)
+            subject: Optional subject line (email/push)
             request_id: Optional idempotency key
 
         Returns:
@@ -111,8 +111,8 @@ class NotificationDispatcher:
             elif channel in (NotificationChannel.SMS, NotificationChannel.WHATSAPP):
                 # Strict phone number matching so tokens don't leak into SMS
                 return [r for r in all_recipients if phone_regex.match(r)]
-            elif channel == NotificationChannel.INAPP:
-                # InApp tokens/user_ids shouldn't be emails or plain phone numbers
+            elif channel == NotificationChannel.PUSH:
+                # Push tokens/user_ids shouldn't be emails or plain phone numbers
                 return [r for r in all_recipients if "@" not in r and not phone_regex.match(r)]
             
             return all_recipients
