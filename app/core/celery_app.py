@@ -42,7 +42,7 @@ celery_app.conf.update(
         "notification.send_email": {"queue": "email_queue"},
         "notification.send_sms": {"queue": "sms_queue"},
         "notification.send_whatsapp": {"queue": "whatsapp_queue"},
-        "notification.send_inapp": {"queue": "inapp_queue"},
+        "notification.send_push": {"queue": "push_queue"},
     },
 
     # Timezone
