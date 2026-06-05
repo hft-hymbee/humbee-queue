@@ -14,8 +14,9 @@ Usage:
     NotificationService.mark_sent(db, notification_id, provider_response={...})
 """
 
+import time
 from datetime import datetime, timezone
-from typing import Optional, List
+from typing import Callable, Optional, List
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -61,17 +62,19 @@ class NotificationService:
             celery_task_id=celery_task_id,
         )
         db.add(record)
-        db.flush()  # Get the ID without committing
+        db.flush()  # Write to session buffer; commit happens in dispatcher after all records are flushed
 
         logger.info(
             "Notification record created",
             extra={
+                "event": "db_record_created",
                 "notification_id": str(id),
                 "channel": channel,
                 "event_type": event_type,
                 "user_id": user_id,
                 "status": NotificationStatus.QUEUED.value,
                 "request_id": request_id,
+                "celery_task_id": celery_task_id,
             },
         )
         return record
@@ -97,7 +100,11 @@ class NotificationService:
         if not record:
             logger.error(
                 "Notification record not found for status update",
-                extra={"notification_id": str(notification_id), "status": status.value},
+                extra={
+                    "event": "db_record_not_found",
+                    "notification_id": str(notification_id),
+                    "status": status.value,
+                },
             )
             return None
 
@@ -124,6 +131,7 @@ class NotificationService:
         logger.info(
             f"Notification status updated to {status.value}",
             extra={
+                "event": "db_status_updated",
                 "notification_id": str(notification_id),
                 "status": status.value,
                 "channel": record.channel,
@@ -192,3 +200,49 @@ class NotificationService:
             query = query.filter(NotificationHistory.status == status)
 
         return query.order_by(NotificationHistory.created_at.desc()).limit(limit).all()
+
+    @staticmethod
+    def wait_for_record(
+        db_session_factory: Callable,
+        notification_id: UUID,
+        max_attempts: int = 3,
+        sleep_seconds: float = 1.0,
+    ) -> Optional["NotificationHistory"]:
+        """
+        Poll for a NotificationHistory record with retries.
+
+        Opens a fresh session per attempt to bypass SQLAlchemy's identity map cache
+        (a single reused session would return the cached None on subsequent calls).
+
+        Returns the record if found within the attempt budget, None otherwise.
+
+        Usage (in Celery tasks):
+            record = NotificationService.wait_for_record(
+                get_db_session, UUID(notification_id)
+            )
+        """
+        for attempt in range(1, max_attempts + 1):
+            with db_session_factory() as db:
+                record = NotificationService.get_by_id(db, notification_id)
+            if record is not None:
+                logger.info(
+                    "Notification record found after polling",
+                    extra={
+                        "event": "db_record_found_after_poll",
+                        "notification_id": str(notification_id),
+                        "attempt": attempt,
+                    },
+                )
+                return record
+            logger.warning(
+                "Notification record not yet visible, retrying",
+                extra={
+                    "event": "db_record_not_found_polling",
+                    "notification_id": str(notification_id),
+                    "attempt": attempt,
+                    "max_attempts": max_attempts,
+                },
+            )
+            if attempt < max_attempts:
+                time.sleep(sleep_seconds)
+        return None
