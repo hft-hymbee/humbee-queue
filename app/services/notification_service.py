@@ -216,6 +216,18 @@ class NotificationService:
 
         Returns the record if found within the attempt budget, None otherwise.
 
+        Important — DetachedInstanceError prevention:
+            get_db_session() commits the session on context exit, and SQLAlchemy's
+            default expire_on_commit=True then expires all attribute values on every
+            instance still attached to the session. Accessing any attribute outside
+            the `with` block would trigger a lazy-reload against a closed session,
+            raising DetachedInstanceError.
+
+            Solution: call db.expunge(record) INSIDE the `with` block before it
+            exits. This removes the instance from the session's identity map so
+            commit() has nothing to expire — all already-loaded column values remain
+            intact in the object's __dict__ and are safely accessible by callers.
+
         Usage (in Celery tasks):
             record = NotificationService.wait_for_record(
                 get_db_session, UUID(notification_id)
@@ -224,6 +236,11 @@ class NotificationService:
         for attempt in range(1, max_attempts + 1):
             with db_session_factory() as db:
                 record = NotificationService.get_by_id(db, notification_id)
+                if record is not None:
+                    # Expunge BEFORE the session commits (context exit).
+                    # This prevents expire_on_commit from wiping the attribute
+                    # cache, making the record safe to use after the session closes.
+                    db.expunge(record)
             if record is not None:
                 logger.info(
                     "Notification record found after polling",
