@@ -41,6 +41,8 @@ class JSONFormatter(logging.Formatter):
             "recipient", "template_id",
             "duration_ms", "error_message", "retry_count",
             "application_mode",
+            # Lifecycle tracing fields
+            "event", "celery_task_id", "attempt",
         ]
         for field in correlation_fields:
             value = getattr(record, field, None)
