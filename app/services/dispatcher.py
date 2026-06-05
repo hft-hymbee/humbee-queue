@@ -4,6 +4,34 @@ Notification Dispatcher
 Handles fanout logic: receives a notification event and dispatches
 individual Celery tasks per (channel × recipient) combination.
 
+Race-condition-safe dispatch order
+-----------------------------------
+The previous implementation called celery_app.send_task() inside the
+per-recipient loop, BEFORE db.commit(). Workers could (and did under high
+load) start executing before the NotificationHistory row was visible to
+other DB sessions, producing:
+
+    "Notification record not found for status update"
+
+The fixed order is:
+
+    Phase 1 — DB writes (flush only, no tasks sent):
+        for each (channel × recipient):
+            pre-generate celery_task_id as a UUID string
+            NotificationService.create(..., celery_task_id=celery_task_id)
+            → db.flush()   # visible to THIS session only
+
+    Phase 2 — Commit:
+        db.commit()        # ALL rows now visible to every session / worker
+
+    Phase 3 — Enqueue (rows guaranteed visible):
+        for each pending dispatch:
+            celery_app.send_task(..., task_id=celery_task_id)
+
+Because celery_task_id is pre-generated and passed to both create() and
+send_task(), the DB record and the Celery task always share the same task
+ID with zero extra DB round-trips.
+
 Usage:
     from services.dispatcher import NotificationDispatcher
 
@@ -17,8 +45,9 @@ Usage:
     )
 """
 
-from typing import List, Optional
 import re
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional
 from uuid import uuid4
 
 from sqlalchemy.orm import Session
@@ -47,10 +76,26 @@ CHANNEL_QUEUE_MAP = {
 }
 
 
+@dataclass
+class _PendingDispatch:
+    """Holds everything needed to enqueue a single Celery task after commit."""
+    notification_id: str
+    celery_task_id: str
+    task_name: str
+    queue: str
+    channel: str
+    recipient: str
+    kwargs: Dict = field(default_factory=dict)
+
+
 class NotificationDispatcher:
     """
     Dispatches notification events to per-channel Celery queues.
-    Creates a notification_history record per (channel × recipient) before dispatching.
+
+    Creates a notification_history record per (channel × recipient) before
+    dispatching. Tasks are enqueued only AFTER all DB records are committed,
+    eliminating the race condition where workers start before the record is
+    visible in the database.
     """
 
     def __init__(self, db: Optional[Session]):
@@ -83,13 +128,18 @@ class NotificationDispatcher:
         Returns:
             List of dicts with notification_id and channel for each dispatched notification
         """
-        # Idempotency check: if request_id already has records, skip
+        # ── Idempotency check ────────────────────────────────────────────────
+        # If request_id already has records, return existing data and skip.
         if request_id and self.db:
             existing = NotificationService.get_by_request_id(self.db, request_id)
             if existing:
                 logger.info(
                     f"Request {request_id} already dispatched ({len(existing)} records), skipping",
-                    extra={"request_id": request_id},
+                    extra={
+                        "event": "dispatch_skipped_duplicate",
+                        "request_id": request_id,
+                        "existing_count": len(existing),
+                    },
                 )
                 return [
                     {
@@ -101,11 +151,9 @@ class NotificationDispatcher:
                     for r in existing
                 ]
 
-        results = []
-
         def _filter_recipients(channel: NotificationChannel, all_recipients: List[str]) -> List[str]:
             phone_regex = re.compile(r"^\+?\d{6,15}$")
-            
+
             if channel == NotificationChannel.EMAIL:
                 return [r for r in all_recipients if "@" in r]
             elif channel in (NotificationChannel.SMS, NotificationChannel.WHATSAPP):
@@ -114,13 +162,19 @@ class NotificationDispatcher:
             elif channel == NotificationChannel.PUSH:
                 # Push tokens/user_ids shouldn't be emails or plain phone numbers
                 return [r for r in all_recipients if "@" not in r and not phone_regex.match(r)]
-            
+
             return all_recipients
+
+        # ── Phase 1: DB writes (flush only — no tasks enqueued yet) ─────────
+        pending_dispatches: List[_PendingDispatch] = []
 
         for channel in channels:
             valid_recipients = _filter_recipients(channel, recipients)
             for recipient in valid_recipients:
                 notification_id = uuid4()
+                # Pre-generate the Celery task ID so it can be stored in the DB
+                # record NOW (during Phase 1) without any back-fill after commit.
+                celery_task_id = str(uuid4())
                 task_name = CHANNEL_TASK_MAP.get(channel)
                 queue_name = CHANNEL_QUEUE_MAP.get(channel)
 
@@ -128,7 +182,6 @@ class NotificationDispatcher:
                     logger.error(f"Unknown channel: {channel}")
                     continue
 
-                # Create DB record
                 if self.db:
                     NotificationService.create(
                         db=self.db,
@@ -141,53 +194,78 @@ class NotificationDispatcher:
                         subject=subject,
                         payload=payload,
                         request_id=request_id,
+                        celery_task_id=celery_task_id,
                     )
+                    # Logging is handled inside NotificationService.create()
+                    # with event="db_record_created"
 
-                # Dispatch to Celery
-                task_result = celery_app.send_task(
-                    task_name,
-                    kwargs={
-                        "notification_id": str(notification_id),
-                        "recipient": recipient,
-                        "template_id": template_id,
-                        "payload": payload,
-                        "subject": subject,
-                        "request_id": request_id,
-                    },
-                    queue=queue_name,
+                pending_dispatches.append(
+                    _PendingDispatch(
+                        notification_id=str(notification_id),
+                        celery_task_id=celery_task_id,
+                        task_name=task_name,
+                        queue=queue_name,
+                        channel=channel.value,
+                        recipient=recipient,
+                        kwargs={
+                            "notification_id": str(notification_id),
+                            "recipient": recipient,
+                            "template_id": template_id,
+                            "payload": payload,
+                            "subject": subject,
+                            "request_id": request_id,
+                        },
+                    )
                 )
 
-                # Update celery_task_id in DB
-                if self.db:
-                    record = NotificationService.get_by_id(self.db, notification_id)
-                    if record:
-                        record.celery_task_id = task_result.id
-
-                logger.info(
-                    f"Dispatched {channel.value} notification",
-                    extra={
-                        "notification_id": str(notification_id),
-                        "channel": channel.value,
-                        "recipient": recipient,
-                        "event_type": event_type,
-                        "request_id": request_id,
-                        "celery_task_id": task_result.id,
-                    },
-                )
-
-                results.append({
-                    "notification_id": str(notification_id),
-                    "channel": channel.value,
-                    "status": "QUEUED",
-                })
-
-        # Commit all DB records
+        # ── Phase 2: Commit ALL records atomically ───────────────────────────
+        # Only after this line are the rows visible to Celery workers.
         if self.db:
             self.db.commit()
+            logger.info(
+                "All notification records committed to database",
+                extra={
+                    "event": "db_committed",
+                    "count": len(pending_dispatches),
+                    "event_type": event_type,
+                    "request_id": request_id,
+                },
+            )
+
+        # ── Phase 3: Enqueue tasks (rows now visible to all DB sessions) ─────
+        results = []
+
+        for dispatch in pending_dispatches:
+            celery_app.send_task(
+                dispatch.task_name,
+                kwargs=dispatch.kwargs,
+                queue=dispatch.queue,
+                task_id=dispatch.celery_task_id,  # matches the celery_task_id stored in DB
+            )
+
+            logger.info(
+                f"Dispatched {dispatch.channel} notification",
+                extra={
+                    "event": "task_enqueued",
+                    "notification_id": dispatch.notification_id,
+                    "celery_task_id": dispatch.celery_task_id,
+                    "channel": dispatch.channel,
+                    "recipient": dispatch.recipient,
+                    "event_type": event_type,
+                    "request_id": request_id,
+                },
+            )
+
+            results.append({
+                "notification_id": dispatch.notification_id,
+                "channel": dispatch.channel,
+                "status": "QUEUED",
+            })
 
         logger.info(
             f"Dispatch complete: {len(results)} notifications queued",
             extra={
+                "event": "dispatch_complete",
                 "event_type": event_type,
                 "request_id": request_id,
                 "total_dispatched": len(results),
