@@ -10,8 +10,11 @@ Usage:
 """
 
 import json
+import logging
 import os
 from typing import Any
+
+logger = logging.getLogger("core.secrets")
 
 
 class SecretsManager:
@@ -51,6 +54,10 @@ class SecretsManager:
                 with open(secrets_path) as f:
                     self._cache = json.load(f)
             except FileNotFoundError:
+                logger.error(
+                    f"secrets.json not found at '{secrets_path}'. "
+                    f"Copy secrets.json.example to secrets.json and fill in values."
+                )
                 raise FileNotFoundError(
                     f"secrets.json not found at '{secrets_path}'. "
                     f"Copy secrets.json.example to secrets.json and fill in values."
@@ -58,6 +65,7 @@ class SecretsManager:
         try:
             return self._cache[group][key]
         except KeyError:
+            logger.error(f"Secret not found in local file: secrets.json['{group}']['{key}'] does not exist")
             raise KeyError(
                 f"Secret not found: secrets.json['{group}']['{key}'] does not exist."
             )
@@ -73,6 +81,7 @@ class SecretsManager:
             }
             
             if self.env not in secret_name_map:
+                logger.error(f"Unsupported environment for AWS Secrets Manager: {self.env}")
                 raise ValueError(f"Unsupported environment for AWS Secrets Manager: {self.env}")
                 
             secret_name = secret_name_map[self.env]
@@ -85,14 +94,17 @@ class SecretsManager:
                 response = client.get_secret_value(SecretId=secret_name)
                 secret_string = response.get("SecretString")
                 if not secret_string:
+                    logger.error(f"SecretString is empty for secret: {secret_name}")
                     raise ValueError(f"SecretString is empty for secret: {secret_name}")
                 self._cache = json.loads(secret_string)
             except Exception as e:
+                logger.error(f"Failed to fetch secret '{secret_name}' from AWS Secrets Manager: {e}")
                 raise RuntimeError(f"Failed to fetch secret '{secret_name}' from AWS Secrets Manager: {e}")
 
         try:
             return self._cache[group][key]
         except KeyError:
+            logger.error(f"Secret not found in AWS secret: ['{group}']['{key}'] does not exist")
             raise KeyError(
                 f"Secret not found: AWS Secret ['{group}']['{key}'] does not exist."
             )

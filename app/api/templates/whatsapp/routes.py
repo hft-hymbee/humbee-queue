@@ -66,6 +66,10 @@ def get_whatsapp_template(
 ):
     template = WhatsAppTemplateService.get_whatsapp_template(db, template_id)
     if not template:
+        logger.warning(
+            f"WhatsApp template not found: {template_id}",
+            extra={"template_id": template_id},
+        )
         raise HTTPException(status_code=404, detail="Template not found")
     return template
 
@@ -84,6 +88,10 @@ def update_whatsapp_template(
     try:
         template = WhatsAppTemplateService.update_whatsapp_template(db, template_id, data)
         if not template:
+            logger.warning(
+                f"WhatsApp template not found for update: {template_id}",
+                extra={"template_id": template_id},
+            )
             raise HTTPException(status_code=404, detail="Template not found")
         logger.info(f"Updated WhatsApp template: {template_id}")
         return template

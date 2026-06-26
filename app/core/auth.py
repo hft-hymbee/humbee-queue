@@ -43,6 +43,7 @@ def require_shared_key(x_api_key: Optional[str] = Header(default=None)) -> None:
       403 if the key is present but invalid or insufficient tier.
     """
     if x_api_key is None:
+        logger.warning("Request rejected: x-api-key header is missing")
         raise HTTPException(status_code=401, detail="x-api-key header is required")
 
     if x_api_key == settings.SHARED_API_KEY:
@@ -53,6 +54,7 @@ def require_shared_key(x_api_key: Optional[str] = Header(default=None)) -> None:
         logger.info(f"Admin '{admin_name}' accessing shared-tier endpoint")
         return
 
+    logger.warning("Request rejected: invalid or insufficient API key for shared-tier endpoint")
     raise HTTPException(status_code=403, detail="Invalid API key")
 
 
@@ -66,6 +68,7 @@ def require_admin_key(x_api_key: Optional[str] = Header(default=None)) -> None:
       403 if the key is present but invalid or is only a shared-tier key.
     """
     if x_api_key is None:
+        logger.warning("Request rejected: x-api-key header is missing for admin-tier endpoint")
         raise HTTPException(status_code=401, detail="x-api-key header is required")
 
     if x_api_key in settings.ADMIN_KEY_VALUES:
@@ -73,4 +76,5 @@ def require_admin_key(x_api_key: Optional[str] = Header(default=None)) -> None:
         logger.info(f"Admin '{admin_name}' accessing admin-tier endpoint")
         return
 
+    logger.warning("Request rejected: invalid or insufficient API key for admin-tier endpoint")
     raise HTTPException(status_code=403, detail="Invalid API key")
