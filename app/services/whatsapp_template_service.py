@@ -43,6 +43,9 @@ class WhatsAppTemplateService:
             for v in variables_map.values()
         )
         if total_positions != variables_count:
+            logger.error(
+                f"WhatsApp template variables_count mismatch: variables_map resolves to {total_positions} position(s), but variables_count is {variables_count}",
+            )
             raise ValueError(
                 f"Invalid variables_count. variables_map resolves to {total_positions} total "
                 f"position(s), but variables_count is {variables_count}. They must match."
@@ -54,8 +57,14 @@ class WhatsAppTemplateService:
         Validates that media_type is set when has_media is True and null when has_media is False.
         """
         if has_media and not media_type:
+            logger.error(
+                "WhatsApp template validation failed: media_type must be set when has_media is True",
+            )
             raise ValueError("media_type must be set when has_media is True.")
         if not has_media and media_type:
+            logger.error(
+                "WhatsApp template validation failed: media_type must be null when has_media is False",
+            )
             raise ValueError("media_type must be null when has_media is False.")
 
     @classmethod
@@ -71,6 +80,9 @@ class WhatsAppTemplateService:
         # Check if template already exists
         existing = cls.get_whatsapp_template(db, data.template_id)
         if existing:
+            logger.error(
+                f"WhatsApp Template with ID '{data.template_id}' already exists",
+            )
             raise ValueError(f"WhatsApp Template with ID '{data.template_id}' already exists.")
 
         template = WhatsAppTemplate(
