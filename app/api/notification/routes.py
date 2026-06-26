@@ -87,14 +87,26 @@ def get_notification_status(
 ):
     """Get the current status of a notification by ID."""
     if not db:
+        logger.error(
+            "Database not available for get_notification_status",
+            extra={"notification_id": notification_id},
+        )
         raise HTTPException(status_code=503, detail="Database not available")
 
     try:
         record = NotificationService.get_by_id(db, UUID(notification_id))
     except ValueError:
+        logger.warning(
+            f"Invalid notification ID format: {notification_id}",
+            extra={"notification_id": notification_id},
+        )
         raise HTTPException(status_code=400, detail="Invalid notification ID format")
 
     if not record:
+        logger.warning(
+            f"Notification not found: {notification_id}",
+            extra={"notification_id": notification_id},
+        )
         raise HTTPException(status_code=404, detail="Notification not found")
 
     return NotificationStatusResponse(
@@ -124,6 +136,10 @@ def get_user_notifications(
 ):
     """Get all notifications for a user, optionally filtered by channel and status."""
     if not db:
+        logger.error(
+            "Database not available for get_user_notifications",
+            extra={"user_id": user_id},
+        )
         raise HTTPException(status_code=503, detail="Database not available")
 
     records = NotificationService.get_by_user_id(
