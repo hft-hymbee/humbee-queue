@@ -42,6 +42,9 @@ class SmsTemplateService:
         actual_count = len(distinct_vars)
         
         if actual_count != expected_count:
+            logger.error(
+                f"SMS template variable count mismatch: expected {expected_count}, found {actual_count} distinct variables {distinct_vars}",
+            )
             raise ValueError(
                 f"Variable count mismatch. Template requires {expected_count} variables "
                 f"but content contains {actual_count} distinct variables: {distinct_vars}"
@@ -55,6 +58,9 @@ class SmsTemplateService:
         # Check if already exists
         existing = cls.get_sms_template(db, data.template_id)
         if existing:
+            logger.error(
+                f"SMS Template with ID {data.template_id} already exists",
+            )
             raise ValueError(f"SMS Template with ID {data.template_id} already exists.")
             
         template = SMSTemplate(
