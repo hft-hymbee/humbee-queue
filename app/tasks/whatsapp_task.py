@@ -10,6 +10,7 @@ Thin wrapper around WhatsAppChannel. Handles:
 import requests
 from uuid import UUID
 
+from celery.exceptions import SoftTimeLimitExceeded
 from core.celery_app import celery_app
 from core.config import settings
 from core.database import get_db_session
@@ -33,7 +34,7 @@ _POLL_SLEEP_SECONDS = 1
     bind=True,
     acks_late=True,
     max_retries=settings.NOTIFICATION_MAX_RETRIES,
-    autoretry_for=(ConnectionError, TimeoutError, Provider5xxError, RateLimitError, ProviderFailedError),
+    autoretry_for=(ConnectionError, TimeoutError, Provider5xxError, RateLimitError, ProviderFailedError, SoftTimeLimitExceeded),
     retry_backoff=30,
     retry_backoff_max=1800,
     retry_jitter=True,
@@ -131,7 +132,7 @@ def send_whatsapp_notification(
         )
         return {"status": "failed", "reason": "validation_error", "message": str(val_err)}
 
-    except (ConnectionError, TimeoutError, Provider5xxError, RateLimitError, ProviderFailedError) as exc:
+    except (ConnectionError, TimeoutError, Provider5xxError, RateLimitError, ProviderFailedError, SoftTimeLimitExceeded) as exc:
         # Mark as failed in DB to update error message and retry count.
         # Celery autoretry_for will handle the actual retry logic and backoff.
         with get_db_session() as db:
