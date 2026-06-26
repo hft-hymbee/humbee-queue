@@ -70,10 +70,18 @@ class WhatsAppChannel(BaseChannel):
 
         with get_db_session() as db:
             if not db:
+                self.logger.error(
+                    "Database session unavailable for WhatsApp template resolution",
+                    extra={"notification_id": self.notification_id, "template_id": self.template_id, "channel": "WHATSAPP"},
+                )
                 raise ValueError("Database session unavailable for WhatsApp template resolution")
 
             template = WhatsAppTemplateService.get_whatsapp_template(db, self.template_id)
             if not template:
+                self.logger.error(
+                    f"No WhatsApp template found for template_id: '{self.template_id}'",
+                    extra={"notification_id": self.notification_id, "template_id": self.template_id, "channel": "WHATSAPP"},
+                )
                 raise ValueError(f"No WhatsApp template found for template_id: '{self.template_id}'")
 
             # Materialize template to a Pydantic model to avoid DetachedInstanceError
@@ -111,6 +119,16 @@ class WhatsAppChannel(BaseChannel):
         parameter_values = {}
         for name, positions in template.variables_map.items():
             if name not in self.payload:
+                self.logger.error(
+                    f"Missing required variable '{name}' for WhatsApp template '{self.template_id}'",
+                    extra={
+                        "notification_id": self.notification_id,
+                        "template_id": self.template_id,
+                        "channel": "WHATSAPP",
+                        "missing_variable": name,
+                        "expected_variables": list(template.variables_map.keys()),
+                    },
+                )
                 raise ValueError(
                     f"Missing required variable '{name}' for WhatsApp template '{self.template_id}'. "
                     f"Expected variables: {list(template.variables_map.keys())}"
@@ -144,6 +162,10 @@ class WhatsAppChannel(BaseChannel):
 
         if not template.has_media:
             if client_media:
+                self.logger.error(
+                    f"Template '{self.template_id}' is text-only but media payload was provided",
+                    extra={"notification_id": self.notification_id, "template_id": self.template_id, "channel": "WHATSAPP"},
+                )
                 raise ValueError(
                     f"Template '{self.template_id}' is a text-only template but "
                     f"media details were provided in the payload. Remove the 'media_payload' key."
@@ -152,6 +174,10 @@ class WhatsAppChannel(BaseChannel):
 
         # Template requires media
         if not client_media:
+            self.logger.error(
+                f"Template '{self.template_id}' requires media but 'media_payload' key is missing",
+                extra={"notification_id": self.notification_id, "template_id": self.template_id, "channel": "WHATSAPP", "expected_media_type": template.media_type},
+            )
             raise ValueError(
                 f"Template '{self.template_id}' requires media (type: {template.media_type}) "
                 f"but the 'media_payload' key is missing from the payload."
@@ -167,12 +193,20 @@ class WhatsAppChannel(BaseChannel):
                     "url": media_url, "type": media_type, "file_name": media_filename
                 }.items() if not v
             ]
+            self.logger.error(
+                f"Incomplete media payload for template '{self.template_id}': missing fields {missing}",
+                extra={"notification_id": self.notification_id, "template_id": self.template_id, "channel": "WHATSAPP", "missing_fields": missing},
+            )
             raise ValueError(
                 f"Incomplete media payload for template '{self.template_id}'. "
                 f"Missing fields: {missing}. Required: 'url', 'type', 'file_name'."
             )
 
         if media_type != template.media_type:
+            self.logger.error(
+                f"Media type mismatch for template '{self.template_id}': expected '{template.media_type}', got '{media_type}'",
+                extra={"notification_id": self.notification_id, "template_id": self.template_id, "channel": "WHATSAPP", "expected": template.media_type, "provided": media_type},
+            )
             raise ValueError(
                 f"Media type mismatch for template '{self.template_id}': "
                 f"template expects '{template.media_type}', payload provided '{media_type}'."
@@ -242,12 +276,24 @@ class WhatsAppChannel(BaseChannel):
         )
 
         if response.status_code == 429:
+            self.logger.error(
+                f"WhatsApp Rate Limit Exceeded (HTTP 429)",
+                extra={"notification_id": self.notification_id, "channel": "WHATSAPP", "recipient": self.recipient, "response": response.text},
+            )
             raise RateLimitError(f"WhatsApp Rate Limit Exceeded: {response.text}")
         elif response.status_code >= 500:
+            self.logger.error(
+                f"WhatsApp Provider Server Error (HTTP {response.status_code})",
+                extra={"notification_id": self.notification_id, "channel": "WHATSAPP", "recipient": self.recipient, "status_code": response.status_code, "response": response.text},
+            )
             raise Provider5xxError(f"WhatsApp Provider Server Error ({response.status_code}): {response.text}")
 
         json_response = response.json()
         if json_response.get("code", None) != 100:
+            self.logger.error(
+                f"WhatsApp provider failed to process message",
+                extra={"notification_id": self.notification_id, "channel": "WHATSAPP", "recipient": self.recipient, "provider_response": json_response},
+            )
             raise ProviderFailedError(f"Whatsapp Provider Failed to Process Message: {json_response}")
 
         response.raise_for_status()

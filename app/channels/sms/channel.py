@@ -26,10 +26,18 @@ class SMSChannel(BaseChannel):
         """
         with get_db_session() as db:
             if not db:
+                self.logger.error(
+                    "Database session unavailable for SMS template resolution",
+                    extra={"notification_id": self.notification_id, "template_id": self.template_id, "channel": "SMS"},
+                )
                 raise ValueError("Database session unavailable for SMS template resolution")
                 
             template = SmsTemplateService.get_sms_template(db, self.template_id)
             if not template:
+                self.logger.error(
+                    f"No SMS template found for template_id: {self.template_id}",
+                    extra={"notification_id": self.notification_id, "template_id": self.template_id, "channel": "SMS"},
+                )
                 raise ValueError(f"No SMS template found for template_id: {self.template_id}")
 
             payload_keys_count = len(self.payload.keys())
@@ -44,6 +52,10 @@ class SMSChannel(BaseChannel):
             try:
                 message = content.format(**self.payload)
             except KeyError as e:
+                self.logger.error(
+                    f"Missing variable {e} in payload for SMS template '{self.template_id}'",
+                    extra={"notification_id": self.notification_id, "template_id": self.template_id, "channel": "SMS", "missing_key": str(e)},
+                )
                 raise ValueError(
                     f"Missing variable {e} in payload for SMS template '{self.template_id}'"
                 )
@@ -93,12 +105,24 @@ class SMSChannel(BaseChannel):
         )
         
         if response.status_code == 429:
+            self.logger.error(
+                "SMS Rate Limit Exceeded (HTTP 429)",
+                extra={"notification_id": self.notification_id, "channel": "SMS", "recipient": self.recipient, "response": response.text},
+            )
             raise RateLimitError(f"SMS Rate Limit Exceeded: {response.text}")
         elif response.status_code >= 500:
+            self.logger.error(
+                f"SMS Provider Server Error (HTTP {response.status_code})",
+                extra={"notification_id": self.notification_id, "channel": "SMS", "recipient": self.recipient, "status_code": response.status_code, "response": response.text},
+            )
             raise Provider5xxError(f"SMS Provider Server Error ({response.status_code}): {response.text}")
         
         json_response = response.json()
         if json_response.get("code", None) != "6001":
+            self.logger.error(
+                "SMS provider failed to process message",
+                extra={"notification_id": self.notification_id, "channel": "SMS", "recipient": self.recipient, "provider_response": json_response},
+            )
             raise ProviderFailedError(f"SMS Provider Failed to Process Message: {json_response}")
             
         response.raise_for_status()
