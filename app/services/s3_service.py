@@ -36,6 +36,10 @@ class S3Service:
             dict containing "bytes" (the raw file) and "filename" (the cleaned filename).
         """
         if not s3_url.startswith("s3://"):
+            logger.error(
+                f"Invalid S3 URL provided: must start with 's3://', got '{s3_url}'",
+                extra={"s3_url": s3_url},
+            )
             raise ValueError(f"Invalid S3 URL. Must start with s3:// (got {s3_url})")
 
         parsed = urlparse(s3_url)
