@@ -143,6 +143,10 @@ class PushChannel(BaseChannel):
             notification=messaging.AndroidNotification(sound="default"),
         )
         apns_config = messaging.APNSConfig(
+            headers={
+                'apns-priority': '10', # '10' for immediate delivery
+                'apns-push-type': 'alert' # 'background' for silent notifications
+            },
             payload=messaging.APNSPayload(
                 aps=messaging.Aps(sound="default", badge=1),
             ),
