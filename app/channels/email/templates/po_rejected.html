@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Credit Approved</title>
+    <title>PO Status Mail</title>
   </head>
   <body
     style="
@@ -14,10 +14,10 @@
     "
   >
     <p>
-      Dear {0}<br /><br />
-      We are {1} to inform you that your dispatch plan against your<br />
-      order bearing no. : <span>{2}</span>, 
-      has been {4} by your supplier : <span>{5}</span><br />
+      Dear $buyer_name<br /><br />
+      We are sorry to inform you that your Purchase Order :
+      <span>$order_booking_id</span>
+      <br />has been rejected by your supplier : <span>$seller_name.</span><br />
     </p>
     <table style="border: 1px solid black; border-collapse: collapse">
       <tr>
@@ -28,7 +28,7 @@
             padding: 10px;
           "
         >
-          Product Name
+          Base Product Name
         </th>
         <th
           style="
@@ -37,11 +37,23 @@
             padding: 10px;
           "
         >
-          Ordered Quantity
+          Quantity
+        </th>
+         <th
+          style="
+            border: 1px solid black;
+            border-collapse: collapse;
+            padding: 10px;
+          "
+        >
+          Price
         </th>
       </tr>
-      {3}
+      $products_table
     </table>
-    <p>Best Regards, <br />Team Humbee</p>
+    <br />
+      Best Regards,<br />
+      Team Humbee
+    </p>
   </body>
 </html>

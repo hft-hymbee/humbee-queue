@@ -14,10 +14,10 @@
     "
   >
     <p>
-      Dear $order_booking_buyer_name<br /><br />
-      We are $greeting to inform you that your Purchase Order :
+      Dear $buyer_name<br /><br />
+      We are glad to inform you that your Purchase Order :
       <span>$order_booking_id</span>
-      <br />has been $po_status by your supplier : <span>$order_booking_seller_name.</span><br />
+      <br />has been approved by your supplier : <span>$seller_name.</span><br />
     </p>
     <table style="border: 1px solid black; border-collapse: collapse">
       <tr>
@@ -49,7 +49,7 @@
           Price
         </th>
       </tr>
-      $table_data
+      $products_table
     </table>
     <br />
       Best Regards,<br />
