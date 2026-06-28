@@ -7,6 +7,7 @@ Thin wrapper around PushChannel. Handles:
 - Retries with exponential backoff
 """
 
+import requests
 from uuid import UUID
 
 from celery.exceptions import SoftTimeLimitExceeded
@@ -150,6 +151,21 @@ def send_push_notification(
             extra={**log_extra, "event": "task_failed_retryable", "retry_count": self.request.retries + 1},
         )
         raise exc
+
+    except requests.exceptions.RequestException as exc:
+        # Non-retryable request errors (e.g. 4xx excluding 429)
+        with get_db_session() as db:
+            NotificationService.mark_failed(
+                db, UUID(notification_id),
+                error_message=f"Non-retryable request error: {exc}",
+                retry_count=self.request.retries,
+            )
+
+        logger.error(
+            f"Push task failed (non-retryable): {exc}",
+            extra={**log_extra, "event": "task_failed", "status": "FAILED"},
+        )
+        return {"status": "failed", "error": str(exc)}
 
     except Exception as exc:
         with get_db_session() as db:

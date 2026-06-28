@@ -168,7 +168,7 @@ def send_whatsapp_notification(
         with get_db_session() as db:
             NotificationService.mark_failed(
                 db, UUID(notification_id),
-                error_message=str(exc),
+                error_message=f"Unexpected error: {exc}",
                 retry_count=self.request.retries,
             )
 
