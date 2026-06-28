@@ -144,7 +144,11 @@ class WhatsAppTemplateService:
     def update_whatsapp_template(
         cls, db: Session, template_id: str, data: WhatsAppTemplateUpdate
     ) -> Optional[WhatsAppTemplate]:
-        template = cls.get_whatsapp_template(db, template_id)
+        template = (
+            db.query(WhatsAppTemplate)
+            .filter(WhatsAppTemplate.template_id == template_id)
+            .first()
+        )
         if not template:
             return None
 
