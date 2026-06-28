@@ -11,7 +11,7 @@ Usage:
 """
 
 import os
-from typing import Optional
+from typing import Optional, Union
 
 from core.secrets import secrets_manager
 
@@ -30,6 +30,7 @@ class Settings:
         self.APPLICATION_MODE: str = self._get("app", "application_mode", default="TEST")
         self.TEST_EMAIL: Optional[str] = self._get("app", "test_email", default=None)
         self.TEST_PHONE: Optional[str] = self._get("app", "test_phone", default=None)
+        self.TEST_FCM_TOKEN: Optional[str] = self._get("app", "test_fcm_token", default=None)
 
         # --- SMTP ---
         self.SMTP_SERVER: str = self._get("smtp", "server", default="")
@@ -68,6 +69,9 @@ class Settings:
         # --- Notifications ---
         self.NOTIFICATION_MAX_RETRIES: int = int(self._get("notifications", "max_retries", default="3"))
 
+        # --- Firebase / FCM ---
+        self.FCM_SERVICE_ACCOUNT_JSON: dict = self._get("firebase", "service_account_json", default={})
+
         # --- API Keys ---
         self.SHARED_API_KEY: str = self._get("api_keys", "shared_key", default="")
         self.ADMIN_KEYS: dict = self._get("api_keys", "admin_keys", default={})
@@ -88,10 +92,21 @@ class Settings:
         """Check if the application is in test mode."""
         return self.APPLICATION_MODE == "TEST"
 
-    def get_recipient(self, channel: str, real_recipient: str) -> str:
+    def get_recipient(
+        self, channel: str, real_recipient: Union[str, list[str]]
+    ) -> Union[str, list[str], None]:
         """
-        In TEST mode, override recipient with test address.
-        In PROD mode, return the real recipient.
+        In TEST mode, override recipient with the configured test address.
+        In PROD mode, return the real recipient unchanged.
+
+        For PUSH channel:
+          - real_recipient is a list[str] of FCM tokens
+          - Returns [TEST_FCM_TOKEN] in TEST mode if a test token is configured.
+          - Returns None in TEST mode if no TEST_FCM_TOKEN is set (skip sending).
+          - Returns the original list in PROD mode.
+        For all other channels:
+          - real_recipient is a str
+          - Returns the test address in TEST mode, or the original str in PROD.
         """
         if not self.is_test_mode:
             return real_recipient
@@ -101,6 +116,11 @@ class Settings:
             return self.TEST_EMAIL
         if channel_upper in ("SMS", "WHATSAPP") and self.TEST_PHONE:
             return self.TEST_PHONE
+        if channel_upper == "PUSH":
+            if self.TEST_FCM_TOKEN:
+                return [self.TEST_FCM_TOKEN]
+            # No test token configured — caller should skip sending
+            return None
 
         return real_recipient
 

@@ -1,16 +1,20 @@
 """
 Push Celery Task
 ================
-Thin wrapper around PushChannel. For now, just marks the DB record as SENT
-since the record itself IS the push notification.
+Thin wrapper around PushChannel. Handles:
+- Idempotency check
+- DB status updates
+- Retries with exponential backoff
 """
 
-
+import requests
 from uuid import UUID
 
+from celery.exceptions import SoftTimeLimitExceeded
 from core.celery_app import celery_app
 from core.config import settings
 from core.database import get_db_session
+from core.exceptions import Provider5xxError, RateLimitError, ProviderFailedError
 from core.logging import get_logger
 from channels.push.channel import PushChannel
 from domain.enums import NotificationStatus
@@ -30,21 +34,26 @@ _POLL_SLEEP_SECONDS = 1
     bind=True,
     acks_late=True,
     max_retries=settings.NOTIFICATION_MAX_RETRIES,
-    retry_backoff=True,
+    autoretry_for=(ConnectionError, TimeoutError, Provider5xxError, RateLimitError, ProviderFailedError, SoftTimeLimitExceeded),
+    retry_backoff=30,
+    retry_backoff_max=1800,
+    retry_jitter=True,
 )
 def send_push_notification(
     self,
     notification_id: str,
-    recipient: str,
+    tokens: list,
     template_id: str,
     payload: dict,
     subject: str = None,
     request_id: str = None,
+    user_id: str = None,
 ):
-    """Process a push notification (DB-only for now)."""
+    """Send a PUSH notification batch via Firebase Cloud Messaging (FCM)."""
     log_extra = {
         "notification_id": notification_id,
         "channel": "PUSH",
+        "token_count": len(tokens),
         "request_id": request_id,
         "celery_task_id": self.request.id,
     }
@@ -52,6 +61,8 @@ def send_push_notification(
     logger.info("Push task started", extra={**log_extra, "event": "task_started"})
 
     # ── DB visibility guard ──────────────────────────────────────────────────
+    # Poll until the NotificationHistory record is visible, or give up and
+    # raise so the task is marked FAILED (not silently skipped).
     record = NotificationService.wait_for_record(
         db_session_factory=get_db_session,
         notification_id=UUID(notification_id),
@@ -77,7 +88,7 @@ def send_push_notification(
     # ── Idempotency check ────────────────────────────────────────────────────
     if record.status == NotificationStatus.SENT.value:
         logger.info(
-            "Push task: already processed, skipping",
+            "Push task: already sent, skipping",
             extra={**log_extra, "event": "task_skipped_already_sent"},
         )
         return {"status": "skipped", "reason": "already_sent"}
@@ -92,10 +103,11 @@ def send_push_notification(
     try:
         channel = PushChannel(
             notification_id=notification_id,
-            recipient=recipient,
+            tokens=tokens,
             template_id=template_id,
             payload=payload,
             subject=subject,
+            user_id=user_id,
         )
         result = channel.send()
 
@@ -105,7 +117,7 @@ def send_push_notification(
             )
 
         logger.info(
-            "Push task completed",
+            "Push task completed successfully",
             extra={**log_extra, "event": "task_completed", "status": "SENT"},
         )
         return result
@@ -123,16 +135,48 @@ def send_push_notification(
         )
         return {"status": "failed", "reason": "validation_error", "message": str(val_err)}
 
-    except Exception as exc:
+    except (ConnectionError, TimeoutError, Provider5xxError, RateLimitError, ProviderFailedError, SoftTimeLimitExceeded) as exc:
+        # Mark as failed in DB to update error message and retry count.
+        # Celery autoretry_for will handle the actual retry logic and backoff.
         with get_db_session() as db:
             NotificationService.mark_failed(
                 db, UUID(notification_id),
-                error_message=str(exc),
+                error_message=f"Retryable error: {exc}",
+                retry_count=self.request.retries,
+            )
+
+        logger.warning(
+            f"Push task failed (retryable): {exc}. Celery will autoretry. "
+            f"(Attempt {self.request.retries + 1}/{self.max_retries})",
+            extra={**log_extra, "event": "task_failed_retryable", "retry_count": self.request.retries + 1},
+        )
+        raise exc
+
+    except requests.exceptions.RequestException as exc:
+        # Non-retryable request errors (e.g. 4xx excluding 429)
+        with get_db_session() as db:
+            NotificationService.mark_failed(
+                db, UUID(notification_id),
+                error_message=f"Non-retryable request error: {exc}",
                 retry_count=self.request.retries,
             )
 
         logger.error(
-            f"Push task failed: {exc}",
+            f"Push task failed (non-retryable): {exc}",
+            extra={**log_extra, "event": "task_failed", "status": "FAILED"},
+        )
+        return {"status": "failed", "error": str(exc)}
+
+    except Exception as exc:
+        with get_db_session() as db:
+            NotificationService.mark_failed(
+                db, UUID(notification_id),
+                error_message=f"Unexpected error: {exc}",
+                retry_count=self.request.retries,
+            )
+
+        logger.error(
+            f"Push task failed (unexpected): {exc}",
             extra={**log_extra, "event": "task_failed", "status": "FAILED"},
         )
         raise

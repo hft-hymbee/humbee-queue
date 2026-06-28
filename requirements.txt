@@ -27,3 +27,6 @@ python-json-logger
 # Monitoring
 flower
 debugpy
+
+# Firebase
+firebase-admin==6.6.0
