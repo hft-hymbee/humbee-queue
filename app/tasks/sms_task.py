@@ -7,7 +7,6 @@ Thin wrapper around SMSChannel. Handles:
 - Retries with exponential backoff
 """
 
-import time
 import requests
 from uuid import UUID
 
