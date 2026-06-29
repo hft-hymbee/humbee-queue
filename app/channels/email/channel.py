@@ -189,15 +189,18 @@ class EmailChannel(BaseChannel):
         - has_media=False + no media in payload      → return None
 
         Expected payload["media_payload"] shape:
-        {
-            "url":       "https://...",
-            "type":      "DOC" | "IMAGE" | "VIDEO",
-            "file_name": "invoice.pdf"
-        }
+        - {"url": "https://...", "type": "DOC" | "IMAGE" | "VIDEO", "file_name": "invoice.pdf"}
+        - or a list of such objects to attach multiple files.
 
-        Returns a dict formatted for email media block, or None.
+        Returns a list of media objects (url/type/file_name), or None.
         """
-        client_medias = self.payload.get("media_payload", [])
+        client_medias = self.payload.get("media_payload")
+        if client_medias is None:
+            client_medias = []
+        elif isinstance(client_medias, dict):
+            client_medias = [client_medias]
+        elif not isinstance(client_medias, list):
+            raise ValueError("media_payload must be an object or a list of objects.")
 
         if not template.has_media:
             if client_medias:
