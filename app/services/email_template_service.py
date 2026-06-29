@@ -163,14 +163,20 @@ class EmailTemplateService:
         new_media_type = update_data.get("media_type", template.media_type)
         new_variables_count = update_data.get("variables_count", template.variables_count)
         new_variables_map = update_data.get("variables_map", template.variables_map)
+        new_table_count = update_data.get("table_count", template.table_count)
+        new_table_map = update_data.get("table_map", template.table_map)
 
         # Validate variables count
         if "variables_count" in update_data or "variables_map" in update_data:
             cls.validate_variables_count(new_variables_map, new_variables_count)
-            
+
         # Validate media consistency
         if "has_media" in update_data or "media_type" in update_data:
             cls.validate_media_consistency(new_has_media, new_media_type)
+
+        # Validate table consistency
+        if "table_count" in update_data or "table_map" in update_data:
+            cls.validate_table_consistency(new_table_map, new_table_count)
 
         for key, value in update_data.items():
             setattr(template, key, value)
