@@ -4,8 +4,7 @@ Email Template Service
 Handles database operations and validation for Email templates.
 
 Key design:
-- variables_map maps human-readable names → positional indices ("0", "1", ...)
-  so callers can use meaningful keys; the channel translates them at send time.
+- variables_map maps payload keys → HTML placeholder names (e.g. "buyer_name" → "buyer_name").
 - has_media + media_type are enforced to be consistent (if has_media, media_type required).
 """
 import json
