@@ -69,7 +69,7 @@ class EmailTemplate(Base):
         JSONB,
         nullable=False,
         default=dict,
-        comment='["product_table": [["Product Name", Quantity]], "order_table": [["Order ID", "Amount"]], ...] - values are lists of lists',
+        comment='{"product_table": [["Product Name", "Quantity"]], "order_table": [["Order ID", "Amount"]], ...} - values are lists of lists',
     )
     created_at = Column(
         DateTime(timezone=True),
