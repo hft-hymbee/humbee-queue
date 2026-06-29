@@ -238,7 +238,7 @@ class NotificationDispatcher:
                     )
                 )
 
-        # ── Phase 2: Commit ALL records automically ───────────────────────────
+        # ── Phase 2: Commit ALL records atomically ───────────────────────────
         # Only after this line are the rows visible to Celery workers.
         if self.db:
             self.db.commit()
