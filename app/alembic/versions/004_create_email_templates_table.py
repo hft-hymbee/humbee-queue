@@ -26,7 +26,7 @@ def upgrade() -> None:
     sa.Column('has_media', sa.Boolean(), nullable=False),
     sa.Column('media_type', sa.String(length=10), nullable=True, comment='IMAGE | DOC | VIDEO — null when has_media=False'),
     sa.Column('table_count', sa.Integer(), nullable=False),
-    sa.Column('table_map', postgresql.JSONB(astext_type=sa.Text()), nullable=False, comment='["product_table": [["Product Name", Quantity]], "order_table": [["Order ID", "Amount"]], ...] - values are lists of lists'),
+    sa.Column('table_map', postgresql.JSONB(astext_type=sa.Text()), nullable=False, comment='{"product_table": [["Product Name", "Quantity"]], "order_table": [["Order ID", "Amount"]], ...} - values are lists of lists'),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
     sa.PrimaryKeyConstraint('template_id')
