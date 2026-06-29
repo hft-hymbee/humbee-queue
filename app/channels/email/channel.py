@@ -26,8 +26,8 @@ class EmailChannel(BaseChannel):
 
     def resolve_template(self) -> EmailTemplateResponse:
         """
-        Load and render the email HTML template with payload variables.
-        Returns rendered HTML string.
+        Fetch the email template metadata/config from the database.
+        Returns an EmailTemplateResponse used for rendering/sending.
         """
         with get_db_session() as db:
             if not db:
