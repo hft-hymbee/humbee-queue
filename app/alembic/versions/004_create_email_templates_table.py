@@ -1,4 +1,4 @@
-""""create email_templates table
+"""create email_templates table
 
 Revision ID: 004
 Revises: 003
