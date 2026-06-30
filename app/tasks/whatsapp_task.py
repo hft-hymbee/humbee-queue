@@ -34,7 +34,10 @@ _POLL_SLEEP_SECONDS = 1
     bind=True,
     acks_late=True,
     max_retries=settings.NOTIFICATION_MAX_RETRIES,
-    autoretry_for=(ConnectionError, TimeoutError, Provider5xxError, RateLimitError, ProviderFailedError, SoftTimeLimitExceeded),
+    autoretry_for=(
+        ConnectionError, TimeoutError, Provider5xxError, RateLimitError, ProviderFailedError, SoftTimeLimitExceeded,
+        requests.exceptions.RequestException
+    ),
     retry_backoff=30,
     retry_backoff_max=1800,
     retry_jitter=True,
@@ -132,7 +135,10 @@ def send_whatsapp_notification(
         )
         return {"status": "failed", "reason": "validation_error", "message": str(val_err)}
 
-    except (ConnectionError, TimeoutError, Provider5xxError, RateLimitError, ProviderFailedError, SoftTimeLimitExceeded) as exc:
+    except (
+        ConnectionError, TimeoutError, Provider5xxError, RateLimitError, ProviderFailedError, SoftTimeLimitExceeded,
+        requests.exceptions.RequestException
+    ) as exc:
         # Mark as failed in DB to update error message and retry count.
         # Celery autoretry_for will handle the actual retry logic and backoff.
         with get_db_session() as db:
@@ -148,21 +154,6 @@ def send_whatsapp_notification(
             extra={**log_extra, "event": "task_failed_retryable", "retry_count": self.request.retries + 1},
         )
         raise exc
-
-    except requests.exceptions.RequestException as exc:
-        # Non-retryable request errors (e.g. 4xx excluding 429)
-        with get_db_session() as db:
-            NotificationService.mark_failed(
-                db, UUID(notification_id),
-                error_message=f"Non-retryable request error: {exc}",
-                retry_count=self.request.retries,
-            )
-
-        logger.error(
-            f"WhatsApp task failed (non-retryable): {exc}",
-            extra={**log_extra, "event": "task_failed", "status": "FAILED"},
-        )
-        return {"status": "failed", "error": str(exc)}
 
     except Exception as exc:
         with get_db_session() as db:
