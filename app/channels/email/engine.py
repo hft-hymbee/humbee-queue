@@ -105,6 +105,7 @@ class EmailEngine:
                     "Content-Disposition", "attachment", filename=file_name
                 )
                 message.attach(file_mime)
+                logger.info(f"Attached file {file_name} to email for {recipient}")
 
         return message.as_string()
 

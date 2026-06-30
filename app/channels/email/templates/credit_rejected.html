@@ -4,13 +4,20 @@
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PO Created</title>
+    <title>Credit Approved</title>
   </head>
-  <body>
-    <p>Dear $seller_name</p>
+  <body
+    style="
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    "
+  >
     <p>
-      We are glad to inform you that a Purchase Order: $order_booking_id has been created by<br />
-      Distributor name: $buyer_name on $date.
+      Dear $buyer_name<br /><br />
+      We are sorry to inform you that your dispatch plan against your<br />
+      order bearing no. : <span>$order_id</span>, 
+      has been rejected by your supplier : <span>$seller_name</span><br />
     </p>
     <table style="border: 1px solid black; border-collapse: collapse">
       <tr>
@@ -21,7 +28,7 @@
             padding: 10px;
           "
         >
-          Base Product Name
+          Product Name
         </th>
         <th
           style="
@@ -30,13 +37,11 @@
             padding: 10px;
           "
         >
-          Quantity
+          Ordered Quantity
         </th>
       </tr>
       $products_table
     </table>
-    <br/>
-    Best Regards,<br />
-    Team Humbee
+    <p>Best Regards, <br />Team Humbee</p>
   </body>
 </html>

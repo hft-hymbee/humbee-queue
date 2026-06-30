@@ -63,6 +63,8 @@ class Settings:
 
         # --- AWS ---
         self.AWS_REGION: str = self._get("aws", "region", default="ap-south-1")
+        self.AWS_ACCESS_KEY_ID: Optional[str] = self._get("aws", "access_key_id", default=None)
+        self.AWS_SECRET_ACCESS_KEY: Optional[str] = self._get("aws", "secret_access_key", default=None)
 
         # --- Notifications ---
         self.NOTIFICATION_MAX_RETRIES: int = int(self._get("notifications", "max_retries", default="3"))

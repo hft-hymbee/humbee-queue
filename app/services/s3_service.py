@@ -21,10 +21,11 @@ class S3Service:
         """
         Get a boto3 S3 client.
         """
-        return boto3.client(
-            "s3",
-            region_name=settings.AWS_REGION,
-        )
+        kwargs = {"region_name": settings.AWS_REGION}
+        if settings.AWS_ACCESS_KEY_ID and settings.AWS_SECRET_ACCESS_KEY:
+            kwargs["aws_access_key_id"] = settings.AWS_ACCESS_KEY_ID
+            kwargs["aws_secret_access_key"] = settings.AWS_SECRET_ACCESS_KEY
+        return boto3.client("s3", **kwargs)
 
     @staticmethod
     def download_file(s3_url: str) -> dict:
